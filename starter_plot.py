@@ -1,13 +1,16 @@
 import sys
 
 import matplotlib
+import numpy as np
+
+from curvefitgui import curve_fit_gui
 
 matplotlib.use("Qt5Agg")
 
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import (
-    NavigationToolbar2QT as NavigationToolbar,
+    FigureCanvasQTAgg,
+    NavigationToolbar2QT,
 )
 from matplotlib.figure import Figure
 from PyQt5 import QtCore, QtWidgets
@@ -113,8 +116,82 @@ class ReadCommandLineArgs:
             self.data_matrix[coordinate - 1][index] = int(el)
 
 
+class CurveFitWindow(QtWidgets.QMainWindow):
+    """
+    Window for curve fitting app
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Window22222")
+
+
 # p = ReadCommandLineArgs()
 # print(p.get_input_data())
+# make navigationtoolbar a class and change toolitems to add more buttons
+class NavigationToolbar(NavigationToolbar2QT):
+    """
+    Customized NavigationToolbar
+    """
+
+    def __init__(self, figure_canvas, parent=None):
+        self.toolitems = (
+            ("Home", "Reset original view", "home", "home"),
+            ("Back", "Back to  previous view", "back", "back"),
+            ("Forward", "Forward to next view", "forward", "forward"),
+            (None, None, None, None),
+            (
+                "Pan",
+                "Pan axes with left mouse, zoom with right",
+                "move",
+                "pan",
+            ),
+            ("Zoom", "Zoom to rectangle", "zoom_to_rect", "zoom"),
+            (
+                "Customize Graph",
+                "Edit axis, curve and image parameters",
+                "grid",
+                "edit_parameters",
+            ),
+            (None, None, None, None),
+            (
+                "Subplots",
+                "Configure subplots",
+                "subplots",
+                "configure_subplots",
+            ),
+            ("Save", "Save the figure", "filesave", "save_figure"),
+            ("Curve Fit", "Curve Fit", "select", "select_tool"),
+        )
+
+        NavigationToolbar2QT.__init__(self, figure_canvas, parent=None)
+
+    def select_tool(self):
+        # self.w = CurveFitWindow()
+        # self.w.show()
+
+        def func(x, a, b, c):
+            """
+            exponential decay
+            function: a * exp(-b * x) + c
+            a : amplitude
+            b : rate
+            c : offset
+            """
+            return a * np.exp(-b * x) + c
+
+        # create test data
+        xdata = np.linspace(0, 4, 50)
+        y = func(xdata, 2.5, 1.3, 0.5)
+        rng = np.random.default_rng()
+        yerr = 0.2 * np.ones_like(xdata)
+        y_noise = yerr * rng.normal(size=xdata.size)
+        ydata = y + y_noise
+
+        # execute the gui
+        popt, pcov = curve_fit_gui(
+            func, xdata, ydata, yerr=yerr, xlabel="x", ylabel="y"
+        )
 
 
 class MplCanvas(FigureCanvasQTAgg):
@@ -138,7 +215,7 @@ class MainWindow(QtWidgets.QMainWindow):
         which defines a single set of axes as self.axes
         """
         input_data = ReadCommandLineArgs()
-        sc = MplCanvas(self, width=5, height=4, dpi=100)
+        sc = MplCanvas(self, width=6, height=4, dpi=100)
         sc.axes.plot(
             input_data.get_input_data()[0],
             input_data.get_input_data()[1],
@@ -148,11 +225,21 @@ class MainWindow(QtWidgets.QMainWindow):
         Create toolbar, passing canvas as first parameter, parent (self, the MainWindow) as second
         """
         toolbar = NavigationToolbar(sc, self)
-        self.setCentralWidget(sc)
+        toolbar.update()
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(toolbar)
+        layout.addWidget(sc)
+        """
+        Create a placeholder widget to hold our toolbar and canvas
+        """
+        widget = QtWidgets.QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
 
         self.show()
 
 
 app = QtWidgets.QApplication(sys.argv)
 w = MainWindow()
-app.exec()
+app.exec_()
