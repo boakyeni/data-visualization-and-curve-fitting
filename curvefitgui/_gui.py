@@ -213,6 +213,10 @@ def execute_gui(
             super().__init__()
 
             def linear(x, a, b):
+                """
+                linear
+                function: ax + b
+                """
 
                 return a * x + b
 

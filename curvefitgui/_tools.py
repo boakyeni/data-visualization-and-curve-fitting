@@ -78,6 +78,8 @@ class Fitter:
         self.kwargs = kwargs
         self.data = self._init_data(xdata, ydata, xerr, yerr)
         self.model = self._init_model(func, p0, absolute_sigma, jac)
+        # Model Result from lmfit
+        self.model_result = None
         self.fit_is_valid = False  # becomes True a a valid fit is computed
         self.mean_squared_error = None
         self.fitreport = {}
@@ -168,7 +170,7 @@ class Fitter:
         if self.model.weight == self.WEIGHTOPTIONS[0]:
             ye = np.ones(len(y))  # error of 1 is equal to no weights
 
-        popt, pcov = curve_fit_wrapper(
+        popt, pcov, result = curve_fit_wrapper(
             self.model.func,
             x,
             y,
@@ -178,6 +180,8 @@ class Fitter:
             absolute_sigma=absolute_sigma,
             jac=self.model.jac,
         )
+        # lmfit model result
+        self.model_result = result
 
         # process results
         self.fit_is_valid = True
@@ -199,7 +203,13 @@ class Fitter:
         if xmax is None:
             xmax = self.data.x.max()
         xcurve = np.linspace(xmin, xmax, numpoints)
-        ycurve = self.model.evaluate(xcurve)
+        # check to see if we have fit results yet, so program does not crash
+        # in future model should be replaces with lmfit model
+        if not self.model_result:
+            ycurve = self.model.evaluate(xcurve)
+        else:
+            # lmfit
+            ycurve = self.model_result.eval(self.model_result.params, x=xcurve)
         return (xcurve, ycurve)
 
     def get_fitcurve(
@@ -214,9 +224,14 @@ class Fitter:
         return the residuals as y - f(x)
         if check is True(default) only returns values if a valid fit is performed.
         """
+
         if not self.fit_is_valid and check:
             return None
-        return self.data.y - self.model.evaluate(self.data.x)
+        if not self.model_result:
+            return None
+        # return self.data.y - self.model.evaluate(self.data.x)
+        # lmfit
+        return self.model_result.residual
 
     def _degrees_of_freedom(self):
         return int(self.data.get_numfitpoints() - self.model.get_numfitpars())
@@ -240,7 +255,11 @@ class Fitter:
                 "t95-val": stats.t.ppf(0.975, self._degrees_of_freedom()),
             },
             "FITRESULTS": pars_to_dict(),
-            "STATISTICS": {"Smin": self.mean_squared_error},
+            "STATISTICS": {
+                "Smin, mean squared error": self.mean_squared_error,
+                "Chi Squared": self.model_result.chisqr,
+                "R^2": self.model_result.rsquared,
+            },
         }
 
     def get_report(self):
@@ -313,15 +332,35 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
     p0_fit = np.array([p for p, fix in zip(p0, pF) if not fix])
 
     # peform the fit with the reduced function
-    popt, cov = curve_fit(fit_func, *pargs, p0=p0_fit, jac=fit_jac, **kwargs)
+    # popt, cov = curve_fit(fit_func, *pargs, p0=p0_fit, jac=fit_jac, **kwargs)
+
+    """
+    lmfit the code below uses the lmfit model, i keep the old model above as a check
+    """
+
+    gmodel = Model(func)
+    params = gmodel.make_params()
+    for arg, fix, p in zip(args[1:], pF, p0):
+        params[arg].vary = not fix
+        params[arg].value = p
+
+    result = gmodel.fit(
+        pargs[1], params, x=pargs[0], calc_covar=True, nan_policy="omit"
+    )
+
+    popt = np.array(list(result.best_values.values()))
+    cov = result.covar
 
     # rebuild the popt and cov to include fixed parameters
     p0_fix = [p for p, fix in zip(p0, pF) if fix]  # values of fixed parameters
     id_fix = np.where(pF)[0]  # indices of fixed parameters
-    for id, p in zip(id_fix, p0_fix):
-        popt = np.insert(
-            popt, id, p, axis=0
-        )  # fill in the popt at the free fit parameters
+    """
+    No longer needed when using lmfit model
+    """
+    # for id, p in zip(id_fix, p0_fix):
+    #     popt = np.insert(
+    #         popt, id, p, axis=0
+    #     )  # fill in the popt at the free fit parameters
 
     # rebuild covariance matrix to include both fixed and optimized pars
     for id in id_fix:
@@ -330,7 +369,7 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
         )  # add zero rows and columns for fixed par
         cov = np.insert(cov, id, 0, axis=0)
 
-    return popt, cov
+    return popt, cov, result
 
 
 def value_to_string(name, value, error, fixed):
@@ -339,7 +378,11 @@ def value_to_string(name, value, error, fixed):
         deci = 5
         s = f"{value:.{deci}e}"
         index_sign = s.find("e") + 1
-        return int(s[index_sign:])
+        # Unsure why but sometimes nan prints and program crashes, this prevents it though
+        print(s[index_sign:])
+        if s[index_sign:] == "nan":
+            return int("+00")
+        return int(float(s[index_sign:]))
 
     def float_to_string(value, exponent, sig_digits=2):
         """
@@ -358,8 +401,11 @@ def value_to_string(name, value, error, fixed):
 
     def to_latex(value_str, exponent, error_str=None):
         """return a latex string
-        (value_str +/- error_str) x 10^(exponent)"""
-        if error_str:
+        (value_str +/- error_str) x 10^(exponent)
+        checks for nan to prevent program crash possibly
+        """
+        if error_str or error_str != "nan":
+            # != nan added to check for crash possibility
             latex_string = (
                 "$= ("
                 + value_str
