@@ -72,7 +72,17 @@ class Fitter:
     WEIGHTOPTIONS = ("none", "relative", "absolute")
 
     def __init__(
-        self, func, xdata, ydata, xerr, yerr, p0, absolute_sigma, jac, **kwargs
+        self,
+        func,
+        xdata,
+        ydata,
+        xerr,
+        yerr,
+        p0,
+        absolute_sigma,
+        jac,
+        is_complex,
+        **kwargs,
     ):
 
         self.kwargs = kwargs
@@ -83,6 +93,7 @@ class Fitter:
         self.fit_is_valid = False  # becomes True a a valid fit is computed
         self.mean_squared_error = None
         self.fitreport = {}
+        self.is_complex = is_complex
 
     def _init_data(self, x, y, xe, ye):
 
@@ -193,7 +204,7 @@ class Fitter:
         self.mean_squared_error = sum(((y - self.model.evaluate(x)) / ye) ** 2)
 
         self._create_report()
-        return popt, pcov
+        return popt, pcov, result
 
     def get_curve(
         self, xmin=None, xmax=None, numpoints=settings["MODEL_NUMPOINTS"]
@@ -211,6 +222,9 @@ class Fitter:
             # lmfit
             ycurve = self.model_result.eval(self.model_result.params, x=xcurve)
         return (xcurve, ycurve)
+
+    def get_model_result(self):
+        return self.model_result
 
     def get_fitcurve(
         self, xmin=None, xmax=None, numpoints=settings["MODEL_NUMPOINTS"]
@@ -279,17 +293,6 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
     same call signature as the curve_fit() function except for:
     pF : 1D numpy array of size n, with n the number of fitparameters of the function
     returns the popt and cov matrices just like the original curve_fit() function
-    """
-
-    """
-        we should iterate through pf and set model params from lmfit .vary to False
-        ex: lmodel = Model(my_cust)
-            params = lmodel.make_params()
-            params['a'].value = p0 ('a' is args in the wrapper)
-            params['a'].vary = False (check in zip of arg and pF)
-            result = lmodel.fit(y, params, x=x)
-
-            then exchange all the popv, cov with the ones from results
     """
 
     # extract arguments of the function func

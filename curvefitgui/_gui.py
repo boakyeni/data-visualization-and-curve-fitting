@@ -23,12 +23,15 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__()
 
         # perform some initial default settings
+        """
+        We could check here if fitter.model.func is complex, then immediately call fit after initGUI() so that model.result populates 
+        """
         self.fitter = afitter
         self.xlabel, self.ylabel = xlabel, ylabel
         self.output = (None, None)
         self.xerrorwarning = settings["XERRORWARNING"]
         self.initGUI()
-
+        # call fit here if complex
         self.plotwidget.update_plot()
 
     def closeEvent(self, event):
@@ -42,16 +45,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self._main = QtWidgets.QWidget()
         self.setCentralWidget(self._main)
 
+        """
+        Holds the fit result has capability of plotting complex result, just needs to know which axis to plot on
+        """
+        self.model_result = self.fitter.get_model_result()
+
         # creating the required widgets
         self.plotwidget = PlotWidget(
-            self.fitter.data, self.xlabel, self.ylabel
+            self.fitter,
+            self.xlabel,
+            self.ylabel,
         )  # holds the plot
         self.modelview = ModelWidget(
             self.fitter.model, self.fitter.get_weightoptions()
         )  # shows the model and allows users to set fitproperties
         self.fitbutton = QtWidgets.QPushButton("FIT", clicked=self.fit)
         self.evalbutton = QtWidgets.QPushButton(
-            "EVALUATE", clicked=self.evaluate
+            "INITIAL EVALUATION", clicked=self.evaluate
         )
         self.reportview = ReportWidget()  # shows the fitresults
         self.quitbutton = QtWidgets.QPushButton("QUIT", clicked=self.close)
@@ -149,7 +159,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "error", OptimizeWarning
             )  # make sure the OptimizeWarning is raised as an exception
             try:
-                fitpars, fitcov = self.fitter.fit()
+                fitpars, fitcov, result = self.fitter.fit()
             except (ValueError, RuntimeError, OptimizeWarning):
                 self.showdialog(str(sys.exc_info()[1]), "critical")
 
@@ -212,6 +222,8 @@ def execute_gui(
         def __init__(self):
             super().__init__()
 
+            self.is_complex = False
+
             def linear(x, a, b):
                 """
                 linear
@@ -248,12 +260,28 @@ def execute_gui(
                 """
                 return a * (np.exp(-x / b) ** 2) * np.cos(c * x + d) + e
 
+            def euler(x, a):
+                """
+                Euler's
+                y = a * exp(i * x)
+                """
+                return a * (np.exp(1j * (x)))
+
+            def complex_function(x, a, b, c, d):
+                """
+                complex exp
+                y = a * exp(i * (b * x + c)) + d
+                """
+                return a * np.exp(1j * (b * x + c)) + d
+
             self.function_map = {
                 "y = ax + b": linear,
                 "y = a * exp(-x / b) + c": exp_decay,
                 "y = a * cos(b*x + c) + d": cosine_function,
                 "y = a * exp(-x / b) * cos(c * x + d) + e": decaying_oscillation,
                 "y = a * exp(-x / b)^2 * cos(c * x + d) + e": decaying_oscillation2,
+                "y = a * exp(i * x)": euler,
+                "y = a * exp(i * (b * x + c)) + d": complex_function,
             }
             """
             Drop down box of functions for curve fit
@@ -284,6 +312,9 @@ def execute_gui(
             """
             On ok from starting pop up this function sets the fit function
             """
+            self.is_complex = (
+                True if "i" in self.combobox.currentText() else False
+            )
             self.func = self.function_map[self.combobox.currentText()]
 
     dlg = CustomDialog()
@@ -309,39 +340,50 @@ def execute_gui(
     """
     Get correct number of parameters for test data, store function values in array y
     """
+    y = f(xdata, *random_arr[1:])
 
-    if num_of_params == 3:
-        y = f(xdata, random_arr[1], random_arr[2])
-    elif num_of_params == 4:
-        y = f(xdata, random_arr[1], random_arr[2], random_arr[3])
-    elif num_of_params == 5:
-        y = f(
-            xdata, random_arr[1], random_arr[2], random_arr[3], random_arr[4]
-        )
-    elif num_of_params == 6:
-        y = f(
-            xdata,
-            random_arr[1],
-            random_arr[2],
-            random_arr[3],
-            random_arr[4],
-            random_arr[5],
-        )
+    # if num_of_params == 3:
+    #     y = f(xdata, random_arr[1], random_arr[2])
+    # elif num_of_params == 4:
+    #     y = f(xdata, random_arr[1], random_arr[2], random_arr[3])
+    # elif num_of_params == 5:
+    #     y = f(
+    #         xdata, random_arr[1], random_arr[2], random_arr[3], random_arr[4]
+    #     )
+    # elif num_of_params == 6:
+    #     y = f(
+    #         xdata,
+    #         random_arr[1],
+    #         random_arr[2],
+    #         random_arr[3],
+    #         random_arr[4],
+    #         random_arr[5],
+    #     )
 
     """
     Create error for test data
     """
-    rng = np.random.default_rng()
-    test_yerr = 0.2 * np.ones_like(xdata)
-    y_noise = test_yerr * rng.normal(size=xdata.size)
-    ydata = y + y_noise
+    # rng = np.random.default_rng()
+    # test_yerr = 0.2 * np.ones_like(xdata)
+    # y_noise = test_yerr * rng.normal(size=xdata.size)
+    ydata = y
+    # + y_noise
 
     """
     gonna have to add sigma to this and other places
     """
 
     afitter = Fitter(
-        f, xdata, ydata, xerr, yerr, p0, absolute_sigma, jac, **kwargs
+        f,
+        xdata,
+        ydata,
+        xerr,
+        yerr,
+        p0,
+        absolute_sigma,
+        jac,
+        dlg.is_complex,
+        **kwargs
     )
     if not showgui:
         return afitter.fit()

@@ -111,11 +111,11 @@ class PlotWidget(QtWidgets.QWidget):
 
     resized = QtCore.pyqtSignal()  # emits when the widget is resized
 
-    def __init__(self, data, xlabel, ylabel):
+    def __init__(self, fitter, xlabel, ylabel):
         QtWidgets.QWidget.__init__(self)
 
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas = PlotCanvas(data, xlabel, ylabel)
+        self.canvas = PlotCanvas(fitter, xlabel, ylabel)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.toolbar.addSeparator()
 
@@ -148,8 +148,9 @@ class PlotWidget(QtWidgets.QWidget):
 class PlotCanvas(FigureCanvas):
     """class to hold a canvas with a matplotlib figure and two subplots for plotting data and residuals"""
 
-    def __init__(self, data, xlabel, ylabel):
-        self.data = data  # contains the x, y and error data
+    def __init__(self, fitter, xlabel, ylabel):
+        self.fitter = fitter
+        self.data = fitter.data  # contains the x, y and error data
         self.fitline = None  # contains the fitline if available
         self.residuals = None  # contains the residuals if available
 
@@ -240,8 +241,14 @@ class PlotCanvas(FigureCanvas):
         )
         self.result_box.draggable()
 
-        # populate plotlines
-        self.data_line.set_data(self.data.x, self.data.y)
+        """
+        self.data.y should be complex still at this point put a print line to check,
+        but set_data most likely casts to real so at this point,
+        
+        """
+        # populate plotlines if not complex data since different plot interpretation needed for complex values
+        if not self.fitter.is_complex:
+            self.data_line.set_data(self.data.x, self.data.y)
 
         # create errorbars if required
         if self.data.ye is not None:
@@ -307,26 +314,52 @@ class PlotCanvas(FigureCanvas):
         else:
             self.data.set_mask(*self.range_selector.get_range())
 
+    def plot_ri(self, data, *args, **kwargs):
+        """
+        convenience function for plotting complex quantities
+        """
+        self.ax1.plot(data.real, data.imag, *args, **kwargs)
+
     def update_plot(self):
         # update the residuals and/or fitline if present
-
-        if self.residuals is not None:
-            # if the zero residual line is not yet created, do so
-            if self.zero_res is None:
-                self.ax2.axhline(y=0, linestyle="--", color="black")
-
-            # sort data if required
-            if settings["SORT_RESIDUALS"]:
-                order = np.argsort(self.data.x)
-            else:
-                order = np.arange(0, len(self.data.x))
-
-            self.residual_line.set_data(
-                self.data.x[order], self.residuals[order]
+        """
+        Here we want access to the Model_Result class and plot complex
+        i.e.
+        if self.fitter.model_result is not None:
+            call self.fitter.model_result.plot_fit( on ax1, parse_complex=angle )
+            ...
+        elif:
+            run code below
+        """
+        if self.fitter.model_result is not None and self.fitter.is_complex:
+            # self.ax1.cla()
+            fit_s21 = self.fitter.model_result.eval(
+                params=self.fitter.model_result.params, f=self.data.x
             )
+            self.plot_ri(fit_s21, ".-", label="best fit")
+        elif self.fitter.model_result is not None:
+            self.fitter.model_result.plot_fit(self.ax1, parse_complex="angle")
+            self.fitter.model_result.plot_residuals(
+                self.ax2, parse_complex="angle"
+            )
+        else:
+            if self.residuals is not None:
+                # if the zero residual line is not yet created, do so
+                if self.zero_res is None:
+                    self.ax2.axhline(y=0, linestyle="--", color="black")
 
-        if self.fitline is not None:
-            self.fitted_line.set_data(self.fitline[0], self.fitline[1])
+                # sort data if required
+                if settings["SORT_RESIDUALS"]:
+                    order = np.argsort(self.data.x)
+                else:
+                    order = np.arange(0, len(self.data.x))
+
+                self.residual_line.set_data(
+                    self.data.x[order], self.residuals[order]
+                )
+
+            if self.fitline is not None:
+                self.fitted_line.set_data(self.fitline[0], self.fitline[1])
 
         # rescale the axis
         self.ax1.relim()
