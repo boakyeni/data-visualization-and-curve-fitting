@@ -19,7 +19,7 @@ class MainWindow(QtWidgets.QMainWindow):
     Main curve fitting window with data plot, residual plot, and report
     """
 
-    def __init__(self, afitter, xlabel, ylabel):
+    def __init__(self, afitter, xlabel, ylabel, **kwargs):
         super(MainWindow, self).__init__()
 
         # perform some initial default settings
@@ -30,15 +30,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.xlabel, self.ylabel = xlabel, ylabel
         self.output = (None, None)
         self.xerrorwarning = settings["XERRORWARNING"]
-        self.initGUI()
+        self.initGUI(**kwargs)
         # call fit here if complex
+        # if self.fitter.is_complex:
+        #     self.fit()
         self.plotwidget.update_plot()
 
     def closeEvent(self, event):
         """needed to properly quit when running in IPython console / Spyder IDE"""
         QtWidgets.QApplication.quit()
 
-    def initGUI(self):
+    def initGUI(self, **kwargs):
         # main GUI proprieties
         self.setGeometry(100, 100, 1415, 900)
         self.setWindowTitle("curvefitgui " + CFGversion)
@@ -55,6 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.fitter,
             self.xlabel,
             self.ylabel,
+            **kwargs,
         )  # holds the plot
         self.modelview = ModelWidget(
             self.fitter.model, self.fitter.get_weightoptions()
@@ -319,7 +322,8 @@ def execute_gui(
 
     dlg = CustomDialog()
     dlg.exec_()
-    f = dlg.func
+    if f is None:
+        f = dlg.func
 
     """
     From this line up to sfitter = Fitter(...) will not be needed in final product this
@@ -335,39 +339,23 @@ def execute_gui(
     sig = signature(f)
     params = sig.parameters
     num_of_params = len(params)
-    random_arr = [random.uniform(0.5, 4)] * num_of_params
+    random_arr = [0] * num_of_params
+    for i in range(len(random_arr)):
+        random_arr[i] = random.uniform(0.5, 4)
 
     """
     Get correct number of parameters for test data, store function values in array y
     """
     y = f(xdata, *random_arr[1:])
-
-    # if num_of_params == 3:
-    #     y = f(xdata, random_arr[1], random_arr[2])
-    # elif num_of_params == 4:
-    #     y = f(xdata, random_arr[1], random_arr[2], random_arr[3])
-    # elif num_of_params == 5:
-    #     y = f(
-    #         xdata, random_arr[1], random_arr[2], random_arr[3], random_arr[4]
-    #     )
-    # elif num_of_params == 6:
-    #     y = f(
-    #         xdata,
-    #         random_arr[1],
-    #         random_arr[2],
-    #         random_arr[3],
-    #         random_arr[4],
-    #         random_arr[5],
-    #     )
+    print(random_arr[1:])
 
     """
     Create error for test data
     """
-    # rng = np.random.default_rng()
-    # test_yerr = 0.2 * np.ones_like(xdata)
-    # y_noise = test_yerr * rng.normal(size=xdata.size)
-    ydata = y
-    # + y_noise
+    rng = np.random.default_rng()
+    test_yerr = 0.2 * np.ones_like(xdata)
+    y_noise = test_yerr * rng.normal(size=xdata.size)
+    ydata = y + y_noise
 
     """
     gonna have to add sigma to this and other places
@@ -383,12 +371,12 @@ def execute_gui(
         absolute_sigma,
         jac,
         dlg.is_complex,
-        **kwargs
+        **kwargs,
     )
     if not showgui:
         return afitter.fit()
 
-    MyApplication = MainWindow(afitter, xlabel, ylabel)
+    MyApplication = MainWindow(afitter, xlabel, ylabel, **kwargs)
     MyApplication.show()
     app.exec_()
     return MyApplication.get_output()

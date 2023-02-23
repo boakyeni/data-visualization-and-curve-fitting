@@ -1,6 +1,12 @@
 # import required packges
+import warnings
+from collections import defaultdict
+
+warnings.filterwarnings("ignore")
+
 import matplotlib.patches as patches
 import numpy as np
+from lmfit import Model
 from matplotlib import rcParams
 
 # Matplotlib packages
@@ -111,11 +117,11 @@ class PlotWidget(QtWidgets.QWidget):
 
     resized = QtCore.pyqtSignal()  # emits when the widget is resized
 
-    def __init__(self, fitter, xlabel, ylabel):
+    def __init__(self, fitter, xlabel, ylabel, **kwargs):
         QtWidgets.QWidget.__init__(self)
 
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.canvas = PlotCanvas(fitter, xlabel, ylabel)
+        self.canvas = PlotCanvas(fitter, xlabel, ylabel, **kwargs)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.toolbar.addSeparator()
 
@@ -148,11 +154,42 @@ class PlotWidget(QtWidgets.QWidget):
 class PlotCanvas(FigureCanvas):
     """class to hold a canvas with a matplotlib figure and two subplots for plotting data and residuals"""
 
-    def __init__(self, fitter, xlabel, ylabel):
+    def __init__(self, fitter, xlabel, ylabel, **kwargs):
         self.fitter = fitter
         self.data = fitter.data  # contains the x, y and error data
         self.fitline = None  # contains the fitline if available
         self.residuals = None  # contains the residuals if available
+        self.complex_data_line = None  # contains complex data line
+        self.complex_fit_line = None  # contains complex fit curve
+        self.complex_residuals = None
+        self.complex_initial_guess_line = None
+        self.kwargs = kwargs
+        self.fitline_kwargs = defaultdict(str)
+
+        # Get Axis titles
+        self.ax1_title = (
+            self.kwargs["title"] if self.kwargs["title"] else "Data"
+        )
+        # delete from kwargs to remove matplotlib error
+        del self.kwargs["title"]
+
+        # Separate Fitline kwargs from data kwargs
+        if "fitline_color" in self.kwargs:
+            self.fitline_kwargs["color"] = kwargs["fitline_color"]
+            del kwargs["fitline_color"]
+        if "fitline_linestyle" in self.kwargs:
+            self.fitline_kwargs["linestyle"] = kwargs["fitline_linestyle"]
+            del kwargs["fitline_linestyle"]
+        if "fitline_linewidth" in self.kwargs:
+            self.fitline_kwargs["linewidth"] = kwargs["fitline_linewidth"]
+            del kwargs["fitline_linewidth"]
+        if "fitline_label" in self.kwargs:
+            self.fitline_kwargs["label"] = kwargs["fitline_label"]
+            del kwargs["fitline_label"]
+
+        # Sets plots defaults
+        self.kwargs = self.set_data_plot_default(**self.kwargs)
+        self.fitline_kwargs = self.set_fit_plot_default(**self.fitline_kwargs)
 
         # setup the FigureCanvas
         self.fig = Figure(dpi=settings["FIG_DPI"], tight_layout=True)
@@ -178,7 +215,7 @@ class PlotCanvas(FigureCanvas):
         self.ax1 = self.fig.add_subplot(
             gs[0:2, 0], sharex=self.ax2
         )  # ax1 holds the plot of the data and spans two rows
-        self.ax1.title.set_text("Data")
+        self.ax1.title.set_text(self.ax1_title)
 
         self.ax1.grid()
         self.ax2.grid()
@@ -199,18 +236,21 @@ class PlotCanvas(FigureCanvas):
         )
 
         # create empty lines for the data, fit and residuals
+        # (self.data_line,) = self.ax1.plot(
+        #     [],
+        #     [],
+        #     color="black",
+        #     marker="o",
+        #     fillstyle="none",
+        #     lw=0,
+        #     label="data",
+        # )
         (self.data_line,) = self.ax1.plot(
             [],
             [],
-            color="black",
-            marker="o",
-            fillstyle="none",
-            lw=0,
-            label="data",
+            **self.kwargs,
         )
-        (self.fitted_line,) = self.ax1.plot(
-            [], [], label="fitted curve", linestyle="--", color="black"
-        )
+        (self.fitted_line,) = self.ax1.plot([], [], **self.fitline_kwargs)
         (self.residual_line,) = self.ax2.plot(
             [], [], color="k", marker=".", lw=1
         )
@@ -246,9 +286,17 @@ class PlotCanvas(FigureCanvas):
         but set_data most likely casts to real so at this point,
         
         """
-        # populate plotlines if not complex data since different plot interpretation needed for complex values
+        # populate plotlines if not complex data since different plot interpretation needed for complex values (the clear circles)
         if not self.fitter.is_complex:
             self.data_line.set_data(self.data.x, self.data.y)
+        else:
+            """
+            Since this is only called once, we do not to save the return value of plot complex,
+            We only need to save the return value of a plot if we plan on calling that function
+            that plots it again,
+            Saving serves the purpose of being able to delete previous curve for redraw
+            """
+            self.plot_complex(self.data.y, "o", **kwargs)
 
         # create errorbars if required
         if self.data.ye is not None:
@@ -284,8 +332,27 @@ class PlotCanvas(FigureCanvas):
                 tick.set_fontproperties(settings["TICK_FONT"])
                 tick.set_fontsize(settings["TICK_SIZE"])
 
+    def set_data_plot_default(self, **kwargs):
+        kwargs["marker"] = "o" if "marker" not in kwargs else kwargs["marker"]
+        kwargs["linewidth"] = (
+            0 if "linewidth" not in kwargs else kwargs["linewidth"]
+        )
+        kwargs["label"] = "data" if "data" not in kwargs else kwargs["data"]
+        return kwargs
+
+    def set_fit_plot_default(self, **kwargs):
+        kwargs["color"] = "black" if "color" not in kwargs else kwargs["color"]
+        kwargs["linestyle"] = (
+            "--" if "linestyle" not in kwargs else kwargs["linestyle"]
+        )
+        kwargs["label"] = (
+            "fitted curve" if "label" not in kwargs else kwargs["label"]
+        )
+        return kwargs
+
     def set_results_box(self, text, loc):
         self.result_box.set_text(text)
+
         self.result_box.set_visible(True)
 
     def disable_results_box(self):
@@ -306,7 +373,24 @@ class PlotCanvas(FigureCanvas):
         self.residuals = residuals
 
     def set_fitline(self, fitline):
-        self.fitline = fitline
+        """
+        Sets both the initial guess fitline and best fit line
+        """
+        if (
+            self.fitter.is_complex
+            and not self.complex_initial_guess_line
+            and not self.fitter.model_result
+        ):
+            if not self.complex_initial_guess_line:
+                """
+                Here is where changes would be made for the initial guess for complex values
+                """
+                (self.complex_initial_guess_line,) = self.plot_complex(
+                    fitline[1], "--g", label="initial guess"
+                )
+                self.ax1.legend()
+        else:
+            self.fitline = fitline
 
     def get_range(self):
         if self.range_selector is None:
@@ -314,34 +398,42 @@ class PlotCanvas(FigureCanvas):
         else:
             self.data.set_mask(*self.range_selector.get_range())
 
-    def plot_ri(self, data, *args, **kwargs):
+    def plot_complex(self, data, *args, **kwargs):
         """
         convenience function for plotting complex quantities
         """
-        self.ax1.plot(data.real, data.imag, *args, **kwargs)
+        return self.ax1.plot(data.real, data.imag, *args, **kwargs)
+
+    def create_fitline_kwargs(self, **kwargs):
+        fitline_kwargs = defaultdict("str")
+        if "fitline_color" in kwargs:
+            fitline_kwargs["color"] = kwargs["fitline_color"]
+        return fitline_kwargs
 
     def update_plot(self):
         # update the residuals and/or fitline if present
-        """
-        Here we want access to the Model_Result class and plot complex
-        i.e.
-        if self.fitter.model_result is not None:
-            call self.fitter.model_result.plot_fit( on ax1, parse_complex=angle )
-            ...
-        elif:
-            run code below
-        """
         if self.fitter.model_result is not None and self.fitter.is_complex:
-            # self.ax1.cla()
             fit_s21 = self.fitter.model_result.eval(
-                params=self.fitter.model_result.params, f=self.data.x
+                params=self.fitter.model_result.params, x=self.fitter.data.x
             )
-            self.plot_ri(fit_s21, ".-", label="best fit")
-        elif self.fitter.model_result is not None:
-            self.fitter.model_result.plot_fit(self.ax1, parse_complex="angle")
-            self.fitter.model_result.plot_residuals(
-                self.ax2, parse_complex="angle"
+            # clear previous fit line
+            if self.complex_data_line:
+                self.complex_data_line.remove()
+            if self.complex_fit_line:
+                self.complex_fit_line.remove()
+            if self.complex_residuals:
+                self.complex_residuals.cla()
+
+            (self.complex_data_line,) = self.plot_complex(
+                self.data.y, **self.kwargs
             )
+
+            (self.complex_fit_line,) = self.plot_complex(
+                fit_s21, "--k", **self.fitline_kwargs
+            )
+            # self.complex_residuals = self.fitter.model_result.plot_residuals(
+            #     ax=self.ax2, datafmt="--ok", parse_complex="abs"
+            # )
         else:
             if self.residuals is not None:
                 # if the zero residual line is not yet created, do so

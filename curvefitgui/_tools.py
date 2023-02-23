@@ -31,8 +31,25 @@ class FitModel:
     func: Any
     jac: Any
     weight: str
+    # lmfit_model: Model
+    # lmfit_parameters: Any
     fitpars: List[FitParameter]
     description: str = ""
+
+    def __post_init__(self) -> None:
+        """
+        Initializes lmfit model and pararemeters
+        """
+        self.lmfit_model = Model(self.func)
+        """
+        parameters and fitpars are the same, 
+        however parameters is set up for lmfit, 
+        whereas fitpars is connected to the PyQt frontend
+        """
+        self.parameters = self.lmfit_model.make_params()
+        for par in self.fitpars:
+            self.parameters[par.name].vary = not par.fixed
+            self.parameters[par.name].value = par.value
 
     def evaluate(self, x):
         return self.func(x, *(par.value for par in self.fitpars))
@@ -182,7 +199,7 @@ class Fitter:
             ye = np.ones(len(y))  # error of 1 is equal to no weights
 
         popt, pcov, result = curve_fit_wrapper(
-            self.model.func,
+            self.model,
             x,
             y,
             sigma=ye,
@@ -215,9 +232,12 @@ class Fitter:
             xmax = self.data.x.max()
         xcurve = np.linspace(xmin, xmax, numpoints)
         # check to see if we have fit results yet, so program does not crash
-        # in future model should be replaces with lmfit model
+        # in future model should be replaces with lmfit model !!!
         if not self.model_result:
-            ycurve = self.model.evaluate(xcurve)
+            # ycurve = self.model.evaluate(xcurve)
+            ycurve = self.model.lmfit_model.eval(
+                self.model.parameters, x=xcurve
+            )
         else:
             # lmfit
             ycurve = self.model_result.eval(self.model_result.params, x=xcurve)
@@ -287,7 +307,7 @@ class Fitter:
             return self.WEIGHTOPTIONS[0:1]
 
 
-def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
+def curve_fit_wrapper(model, *pargs, p0=None, pF=None, jac=None, **kwargs):
     """
     wrapper around the scipy curve_fit() function to allow parameters to be fixed
     same call signature as the curve_fit() function except for:
@@ -296,7 +316,7 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
     """
 
     # extract arguments of the function func
-    __args = inspect.signature(func).parameters
+    __args = inspect.signature(model.func).parameters
     args = [arg.name for arg in __args.values()]
 
     # populate pF (fixed marker) and p0 (param value) to default if not provided in kwargs
@@ -341,13 +361,14 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
     lmfit the code below uses the lmfit model, i keep the old model above as a check
     """
 
-    gmodel = Model(func)
-    params = gmodel.make_params()
+    # gmodel = Model(func)
+    # params = gmodel.make_params()
+    params = model.parameters
     for arg, fix, p in zip(args[1:], pF, p0):
         params[arg].vary = not fix
         params[arg].value = p
-
-    result = gmodel.fit(
+    # From the model wrapper class access lmfit model
+    result = model.lmfit_model.fit(
         pargs[1], params, x=pargs[0], calc_covar=True, nan_policy="omit"
     )
 
@@ -371,7 +392,7 @@ def curve_fit_wrapper(func, *pargs, p0=None, pF=None, jac=None, **kwargs):
             cov, id, 0, axis=1
         )  # add zero rows and columns for fixed par
         cov = np.insert(cov, id, 0, axis=0)
-
+    # params here temporarily, in future move lmfit model to fitmodel so that params does not need to be returned here
     return popt, cov, result
 
 
@@ -382,7 +403,7 @@ def value_to_string(name, value, error, fixed):
         s = f"{value:.{deci}e}"
         index_sign = s.find("e") + 1
         # Unsure why but sometimes nan prints and program crashes, this prevents it though
-        print(s[index_sign:])
+
         if s[index_sign:] == "nan":
             return int("+00")
         return int(float(s[index_sign:]))
@@ -405,9 +426,11 @@ def value_to_string(name, value, error, fixed):
     def to_latex(value_str, exponent, error_str=None):
         """return a latex string
         (value_str +/- error_str) x 10^(exponent)
-        checks for nan to prevent program crash possibly
+        checks for nan or None to prevent program crash possibly
         """
-        if error_str or error_str != "nan":
+        error_str = "0" if error_str is None else error_str
+
+        if error_str and error_str != "nan":
             # != nan added to check for crash possibility
             latex_string = (
                 "$= ("
