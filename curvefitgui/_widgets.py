@@ -1,8 +1,10 @@
 # import required packges
 import warnings
 from collections import defaultdict
+import io
 
 warnings.filterwarnings("ignore")
+
 
 import matplotlib.patches as patches
 import numpy as np
@@ -19,9 +21,12 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.figure import Figure
 from matplotlib.path import Path
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtGui import QImage
+from PyQt5.QtWidgets import QApplication
 
 from ._settings import settings
 from ._tools import float_to_str
+
 
 rcParams["mathtext.fontset"] = "cm"
 
@@ -159,21 +164,22 @@ class PlotCanvas(FigureCanvas):
         self.data = fitter.data  # contains the x, y and error data
         self.fitline = None  # contains the fitline if available
         self.residuals = None  # contains the residuals if available
-        self.complex_data_line = None  # contains complex data line
-        self.complex_fit_line = None  # contains complex fit curve
         self.complex_residuals = None
-        self.complex_initial_guess_line = None
+        self.initial_guess_line = None
         self.kwargs = kwargs
         self.fitline_kwargs = defaultdict(str)
 
         # Get Axis titles
         self.ax1_title = (
-            self.kwargs["title"] if self.kwargs["title"] else "Data"
+            self.kwargs["title"] if "title" in self.kwargs else "Data"
         )
         # delete from kwargs to remove matplotlib error
-        del self.kwargs["title"]
+        if "title" in self.kwargs:
+            del self.kwargs["title"]
+        if "method" in self.kwargs:
+            del self.kwargs["method"]
 
-        # Separate Fitline kwargs from data kwargs
+        # Separate Fitline kwargs from data kwargs, at this point kwargs and self.kwargs are same thing
         if "fitline_color" in self.kwargs:
             self.fitline_kwargs["color"] = kwargs["fitline_color"]
             del kwargs["fitline_color"]
@@ -290,13 +296,11 @@ class PlotCanvas(FigureCanvas):
         if not self.fitter.is_complex:
             self.data_line.set_data(self.data.x, self.data.y)
         else:
-            """
-            Since this is only called once, we do not to save the return value of plot complex,
-            We only need to save the return value of a plot if we plan on calling that function
-            that plots it again,
-            Saving serves the purpose of being able to delete previous curve for redraw
-            """
-            self.plot_complex(self.data.y, "o", **kwargs)
+            self.data_line.remove()
+            (self.data_line,) = self.plot_complex(
+                self.data.y, "o", **self.kwargs
+            )
+            self.ax1.legend()
 
         # create errorbars if required
         if self.data.ye is not None:
@@ -332,12 +336,22 @@ class PlotCanvas(FigureCanvas):
                 tick.set_fontproperties(settings["TICK_FONT"])
                 tick.set_fontsize(settings["TICK_SIZE"])
 
+        def add_figure_to_clipboard(event):
+            if event.key == "ctrl+c":
+                with io.BytesIO() as buffer:
+                    self.fig.savefig(buffer)
+                    QApplication.clipboard().setImage(
+                        QImage.fromData(buffer.getvalue())
+                    )
+
+        self.fig.canvas.mpl_connect("key_press_event", add_figure_to_clipboard)
+
     def set_data_plot_default(self, **kwargs):
         kwargs["marker"] = "o" if "marker" not in kwargs else kwargs["marker"]
         kwargs["linewidth"] = (
             0 if "linewidth" not in kwargs else kwargs["linewidth"]
         )
-        kwargs["label"] = "data" if "data" not in kwargs else kwargs["data"]
+        kwargs["label"] = "data" if "label" not in kwargs else kwargs["label"]
         return kwargs
 
     def set_fit_plot_default(self, **kwargs):
@@ -376,16 +390,12 @@ class PlotCanvas(FigureCanvas):
         """
         Sets both the initial guess fitline and best fit line
         """
-        if (
-            self.fitter.is_complex
-            and not self.complex_initial_guess_line
-            and not self.fitter.model_result
-        ):
-            if not self.complex_initial_guess_line:
+        if self.fitter.is_complex and not self.fitter.model_result:
+            if not self.initial_guess_line:
                 """
                 Here is where changes would be made for the initial guess for complex values
                 """
-                (self.complex_initial_guess_line,) = self.plot_complex(
+                (self.initial_guess_line,) = self.plot_complex(
                     fitline[1], "--g", label="initial guess"
                 )
                 self.ax1.legend()
@@ -412,28 +422,36 @@ class PlotCanvas(FigureCanvas):
 
     def update_plot(self):
         # update the residuals and/or fitline if present
-        if self.fitter.model_result is not None and self.fitter.is_complex:
+
+        if self.fitter.model_result and self.fitter.is_complex:
             fit_s21 = self.fitter.model_result.eval(
                 params=self.fitter.model_result.params, x=self.fitter.data.x
             )
             # clear previous fit line
-            if self.complex_data_line:
-                self.complex_data_line.remove()
-            if self.complex_fit_line:
-                self.complex_fit_line.remove()
-            if self.complex_residuals:
-                self.complex_residuals.cla()
+            # if self.data_line:
+            #     self.data_line.remove()
+            if self.fitted_line:
+                self.fitted_line.remove()
+            if self.initial_guess_line:
+                self.initial_guess_line.remove()
+                self.initial_guess_line = None
 
-            (self.complex_data_line,) = self.plot_complex(
-                self.data.y, **self.kwargs
-            )
+            self.ax2.lines.clear()
+            # if self.complex_residuals:
+            #     self.complex_residuals.cla()
 
-            (self.complex_fit_line,) = self.plot_complex(
+            # (self.data_line,) = self.plot_complex(self.data.y, **self.kwargs)
+
+            (self.fitted_line,) = self.plot_complex(
                 fit_s21, "--k", **self.fitline_kwargs
             )
-            # self.complex_residuals = self.fitter.model_result.plot_residuals(
-            #     ax=self.ax2, datafmt="--ok", parse_complex="abs"
-            # )
+            self.complex_residuals = self.fitter.model_result.plot_residuals(
+                ax=self.ax2,
+                datafmt=".-k",
+                parse_complex="abs",
+                data_kws={"label": "residual"},
+            )
+            self.ax1.legend()
         else:
             if self.residuals is not None:
                 # if the zero residual line is not yet created, do so
@@ -445,10 +463,31 @@ class PlotCanvas(FigureCanvas):
                     order = np.argsort(self.data.x)
                 else:
                     order = np.arange(0, len(self.data.x))
+                print("self.data.x", self.data.x, type(self.data.x))
+                print("self.residuals", self.residuals, type(self.residuals))
+                print("order slice", order[: len(self.residuals)], type(order))
+                print("len of mask", len(self.data.mask), type(self.data.mask))
+                print("self mask", self.data.mask)
 
+                """
+                Make a copy of data.x
+                iterate thru mask
+                if data.mask[i] is false then delete data.x[i] in the copy
+                use that copy in the residual line set data.
+                """
+                data_copy = np.array([])
+                for i in range(len(self.data.x)):
+                    if self.data.mask[i] == True:
+                        data_copy = np.append(data_copy, [self.data.x[i]])
                 self.residual_line.set_data(
-                    self.data.x[order], self.residuals[order]
+                    data_copy[order[: len(self.residuals)]],
+                    self.residuals[order[: len(self.residuals)]],
                 )
+
+                # self.residual_line.set_data(
+                #     self.data.x[order],
+                #     self.residuals[order[: len(self.residuals)]],
+                # )
 
             if self.fitline is not None:
                 self.fitted_line.set_data(self.fitline[0], self.fitline[1])
@@ -585,6 +624,7 @@ class ModelWidget(QtWidgets.QGroupBox):
         for parview in self.parviews:
             parview.read_value()
         self.model.weight = self.get_weight()
+        self.model.update()
         return None
 
     def update_values(self):

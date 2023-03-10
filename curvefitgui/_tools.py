@@ -57,6 +57,11 @@ class FitModel:
     def get_numfitpars(self):
         return sum([not par.fixed for par in self.fitpars])
 
+    def update(self):
+        for par in self.fitpars:
+            self.parameters[par.name].vary = not par.fixed
+            self.parameters[par.name].value = par.value
+
 
 @dataclass
 class FitData:
@@ -111,6 +116,9 @@ class Fitter:
         self.mean_squared_error = None
         self.fitreport = {}
         self.is_complex = is_complex
+        self.method = "leastsq"
+        if "method" in kwargs:
+            self.method = kwargs["method"]
 
     def _init_data(self, x, y, xe, ye):
 
@@ -205,6 +213,7 @@ class Fitter:
             sigma=ye,
             p0=p0,
             pF=pF,
+            method=self.method,
             absolute_sigma=absolute_sigma,
             jac=self.model.jac,
         )
@@ -307,7 +316,9 @@ class Fitter:
             return self.WEIGHTOPTIONS[0:1]
 
 
-def curve_fit_wrapper(model, *pargs, p0=None, pF=None, jac=None, **kwargs):
+def curve_fit_wrapper(
+    model, *pargs, p0=None, pF=None, jac=None, method="leastsq", **kwargs
+):
     """
     wrapper around the scipy curve_fit() function to allow parameters to be fixed
     same call signature as the curve_fit() function except for:
@@ -369,7 +380,12 @@ def curve_fit_wrapper(model, *pargs, p0=None, pF=None, jac=None, **kwargs):
         params[arg].value = p
     # From the model wrapper class access lmfit model
     result = model.lmfit_model.fit(
-        pargs[1], params, x=pargs[0], calc_covar=True, nan_policy="omit"
+        pargs[1],
+        params,
+        x=pargs[0],
+        calc_covar=True,
+        nan_policy="omit",
+        method=method,
     )
 
     popt = np.array(list(result.best_values.values()))

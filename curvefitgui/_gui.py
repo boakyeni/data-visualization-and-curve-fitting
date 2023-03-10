@@ -167,6 +167,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.showdialog(str(sys.exc_info()[1]), "critical")
 
             else:
+                """
+                change to return result object
+                """
                 # update output
                 self.set_output((fitpars, fitcov))
 
@@ -194,6 +197,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return text
 
 
+# add is_complex parameter
 def execute_gui(
     f,
     xdata,
@@ -273,7 +277,7 @@ def execute_gui(
             def complex_function(x, a, b, c, d):
                 """
                 complex exp
-                y = a * exp(i * (b * x + c)) + d
+                y = a * exp(i * (b * w + c)) + d
                 """
                 return a * np.exp(1j * (b * x + c)) + d
 
@@ -284,7 +288,7 @@ def execute_gui(
                 "y = a * exp(-x / b) * cos(c * x + d) + e": decaying_oscillation,
                 "y = a * exp(-x / b)^2 * cos(c * x + d) + e": decaying_oscillation2,
                 "y = a * exp(i * x)": euler,
-                "y = a * exp(i * (b * x + c)) + d": complex_function,
+                "y = a * exp(i * (b * w + c)) + d": complex_function,
             }
             """
             Drop down box of functions for curve fit
@@ -316,7 +320,7 @@ def execute_gui(
             On ok from starting pop up this function sets the fit function
             """
             self.is_complex = (
-                True if "i" in self.combobox.currentText() else False
+                True if "i" in self.combobox.currentText() else self.is_complex
             )
             self.func = self.function_map[self.combobox.currentText()]
 
