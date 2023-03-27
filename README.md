@@ -75,7 +75,7 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
        def linear(x, a, b, c): 
               return y = a * x + b
 
-       curvefitgui(linear, xdata, ydata)
+       curve_fit_gui(linear, xdata, ydata)
 ```
 
 ### User defined complex functions

@@ -1,3 +1,4 @@
+.DS_Store
 .gitignore
 MANIFEST.in
 README.md
@@ -12,6 +13,7 @@ complex_curve_fit_gui.egg-info/PKG-INFO
 complex_curve_fit_gui.egg-info/SOURCES.txt
 complex_curve_fit_gui.egg-info/dependency_links.txt
 complex_curve_fit_gui.egg-info/top_level.txt
+curvefitgui/.DS_Store
 curvefitgui/__init__.py
 curvefitgui/_curvefitgui.py
 curvefitgui/_gui.py
@@ -20,6 +22,10 @@ curvefitgui/_tools.py
 curvefitgui/_version.py
 curvefitgui/_widgets.py
 curvefitgui/config.txt
+curvefitgui.egg-info/PKG-INFO
+curvefitgui.egg-info/SOURCES.txt
+curvefitgui.egg-info/dependency_links.txt
+curvefitgui.egg-info/top_level.txt
 curvefitgui/__pycache__/__init__.cpython-311.pyc
 curvefitgui/__pycache__/__init__.cpython-39.pyc
 curvefitgui/__pycache__/_curvefitgui.cpython-311.pyc
@@ -31,3 +37,10 @@ curvefitgui/__pycache__/_settings.cpython-39.pyc
 curvefitgui/__pycache__/_tools.cpython-39.pyc
 curvefitgui/__pycache__/_version.cpython-39.pyc
 curvefitgui/__pycache__/_widgets.cpython-39.pyc
+images/arrows_scr.png
+images/customize_scr.png
+images/home_scr.png
+images/model_scr.png
+images/pan_zoom_scr.png
+images/range_selector_scr.png
+images/toolbar_scr.png
