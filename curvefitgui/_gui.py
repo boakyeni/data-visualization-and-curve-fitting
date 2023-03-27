@@ -330,8 +330,10 @@ def execute_gui(
         f = dlg.func
 
     """
+    !!!
     From this line up to sfitter = Fitter(...) will not be needed in final product this
-    is just fro test
+    is just for testing
+    !!!
     """
 
     """
@@ -340,26 +342,27 @@ def execute_gui(
     in user selected function
 
     """
-    sig = signature(f)
-    params = sig.parameters
-    num_of_params = len(params)
-    random_arr = [0] * num_of_params
-    for i in range(len(random_arr)):
-        random_arr[i] = random.uniform(0.5, 4)
+    if ydata is None:
+        sig = signature(f)
+        params = sig.parameters
+        num_of_params = len(params)
+        random_arr = [0] * num_of_params
+        for i in range(len(random_arr)):
+            random_arr[i] = random.uniform(0.5, 4)
 
-    """
-    Get correct number of parameters for test data, store function values in array y
-    """
-    y = f(xdata, *random_arr[1:])
-    print(random_arr[1:])
+        """
+        Get correct number of parameters for test data, store function values in array y
+        """
+        y = f(xdata, *random_arr[1:])
+        print(random_arr[1:])
 
-    """
-    Create error for test data
-    """
-    rng = np.random.default_rng()
-    test_yerr = 0.2 * np.ones_like(xdata)
-    y_noise = test_yerr * rng.normal(size=xdata.size)
-    ydata = y + y_noise
+        """
+        Create error for test data
+        """
+        rng = np.random.default_rng()
+        test_yerr = 0.2 * np.ones_like(xdata)
+        y_noise = test_yerr * rng.normal(size=xdata.size)
+        ydata = y + y_noise
 
     """
     gonna have to add sigma to this and other places

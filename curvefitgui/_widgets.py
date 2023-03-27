@@ -178,6 +178,8 @@ class PlotCanvas(FigureCanvas):
             del self.kwargs["title"]
         if "method" in self.kwargs:
             del self.kwargs["method"]
+        if "is_complex" in self.kwargs:
+            del self.kwargs["is_complex"]
 
         # Separate Fitline kwargs from data kwargs, at this point kwargs and self.kwargs are same thing
         if "fitline_color" in self.kwargs:

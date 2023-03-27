@@ -63,6 +63,12 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
  - kwargs
         keyword arguments for compatibility (e.g. you can use sigma to specify the error in y)
 
+### Return Data
+- The curve fit function returns a tuple with three elements.
+       1. Array containing the fit parameters
+       2. Array containing the standard error (+/-)
+       3. lmfit Model_Result object pertaining to the best fit, reference here: https://lmfit.github.io/lmfit-py/model.html#the-modelresult-class
+
 ### User defined functions
  - To make a user defined function create a function and pass to curve_fit_gui as f. For example: 
  ```python
@@ -96,6 +102,7 @@ Options for customizing fitline inlclude color, linestyle, and thickness. The va
 1. **Data plot:** A matplotlib plot that shows the data as solid dots and both y-error and x-error errorbars if provided. A fitted curve as a dashed line is shown if a fit is performed.
 2. **Residual plot** A matplotlib plot that shows the residuals as the difference between the measured and fitted values:
 3. **Model settings:** Here you can enter inital values for the fitparameters. By ticking the checkbox `fix` you can set a parameter to fixed:e.g. the parameter is not optimised during the fit.
+ ![Model Image](images/model_scr.png)
 4. **Weight settings:** If error data on the y-values are passed using the keyword argument `yerr` you can use the dropdownbox to set how the error data is treated:
     - *None*: the error data is ignored
     - *Relative*: Use the error data for a relative weight. Corresponds to setting scipy's curve_fit() function keyword `absolute_sigma = False`.
@@ -105,8 +112,13 @@ Options for customizing fitline inlclude color, linestyle, and thickness. The va
 7. **Report:** When a fit is performed, the results are shown here. The information on the model is actually the provided docstring of the function `f` that is passed to the `curvefitgui` function.
 8. **Quit:** Quits the gui and returns a tuple of best-fit parameters, confidence interval, and Model Result object from lmfit. [Model Result](https://lmfit.github.io/lmfit-py/model.html#lmfit.model.ModelResult)
 9. **Toolbar:** This is the standard matplotlib toolbar to adjust some plot properties and provides zoom/pan and save options.
+  - **Customize** Change visual features of the plot such as marker type or color and axis titles ![Customize Button Image](images/customize_scr.png)
+  - **Pan and Zoom** Shift and zoom on plot ![Pan and Zoom](images/pan_zoom_scr.png)
+  - **Left and Right** Undo and redo actions for shift and zoom ![Undo and Redo](images/arrows_scr.png)
+  - **Home** Return to original plot view ![Home](images/home_scr.png)
 10. **FitTextbox:** This textbox is generated if a valid fit is performed. It can be moved by the mouse to any convenient positions in the plot.
 11. **Range Selector** Activates/deactivates the range-selector. The range-selector allows to select a datarange used for fitting. Only datapoints that are within the two vertical dashed lines are considered during fitting. The lines can be moved using the mouse.
+![Range Selector](images/range_selector_scr.png)
 
 
 
