@@ -79,7 +79,7 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
 ```
 
 ### User defined complex functions
- - When defining a complex function use `1j`. For example for Euler's equation e^(ix)cs:
+ - When defining a complex function add the **is_complex=True** keyword argument and use `1j` in the equation. For example for Euler's equation e^(ix)cs:
        `return a * (np.exp(1j * (x)))`
 
 
