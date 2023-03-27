@@ -229,7 +229,9 @@ def execute_gui(
         def __init__(self):
             super().__init__()
 
-            self.is_complex = False
+            self.is_complex = (
+                False if "complex" not in kwargs else kwargs["complex"]
+            )
 
             def linear(x, a, b):
                 """
@@ -367,6 +369,9 @@ def execute_gui(
     """
     gonna have to add sigma to this and other places
     """
+    # Here so that complex bool passes through to widgets
+    if dlg.is_complex:
+        kwargs["complex"] = True
 
     afitter = Fitter(
         f,

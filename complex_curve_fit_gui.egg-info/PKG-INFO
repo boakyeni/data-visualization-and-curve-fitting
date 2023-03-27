@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: complex-curve-fit-gui
-Version: 1.0.5
+Version: 1.0.6
 Summary: GUI for lmfit
 Home-page: https://github.com/boakyeni/data-visualization-and-curve-fitting
 Author: Kojo Nimako
@@ -89,7 +89,7 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
        def linear(x, a, b, c): 
               return y = a * x + b
 
-       curvefitgui(linear, xdata, ydata)
+       curve_fit_gui(linear, xdata, ydata)
 ```
 
 ### User defined complex functions

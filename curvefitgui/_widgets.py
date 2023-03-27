@@ -168,6 +168,9 @@ class PlotCanvas(FigureCanvas):
         self.initial_guess_line = None
         self.kwargs = kwargs
         self.fitline_kwargs = defaultdict(str)
+        self.complex = (
+            False if "complex" not in self.kwargs else self.kwargs["complex"]
+        )
 
         # Get Axis titles
         self.ax1_title = (
@@ -178,8 +181,8 @@ class PlotCanvas(FigureCanvas):
             del self.kwargs["title"]
         if "method" in self.kwargs:
             del self.kwargs["method"]
-        if "is_complex" in self.kwargs:
-            del self.kwargs["is_complex"]
+        if "complex" in self.kwargs:
+            del self.kwargs["complex"]
 
         # Separate Fitline kwargs from data kwargs, at this point kwargs and self.kwargs are same thing
         if "fitline_color" in self.kwargs:
@@ -376,9 +379,14 @@ class PlotCanvas(FigureCanvas):
 
     def toggle_rangeselector(self):
         if self.range_selector is None:
-            self.range_selector = RangeSelector(
-                self.ax1, np.min(self.data.x), np.max(self.data.x)
-            )
+            if self.complex:
+                self.range_selector = RangeSelector(
+                    self.ax1, np.min(self.data.y), np.max(self.data.y)
+                )
+            else:
+                self.range_selector = RangeSelector(
+                    self.ax1, np.min(self.data.x), np.max(self.data.x)
+                )
             self.redraw()
         else:
             self.range_selector.remove()

@@ -22,7 +22,7 @@ class Main:
             self.xdata,
             None,
             title="Complex Graph",
-            xlabel="x axis",
+            xlabel="y axis",
             ylabel="Imaginary",
             fitline_color="red",
             color="black",
