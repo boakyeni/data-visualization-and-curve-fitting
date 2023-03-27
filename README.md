@@ -3,12 +3,12 @@ conda activate /Users/kojo/opt/anaconda3-->
 
 ## Installation
 
-You can install the `curvefitgui` from [PyPi](https://pypi.org/project/complex-curve-fit-gui/):
+You can install the `complex-curve-fit-gui` from [PyPi](https://pypi.org/project/complex-curve-fit-gui/):
 
-    pip install curvefitgui
+    pip install complex-curve-fit-gui
 
 The GUI is supported on Python 3.7 and above.  
-**Note**: only `curvefitgui` is installed without any required dependencies. Depending on if you are using pip or conda to manage your environment you should manually install the following additional packages:  
+**Note**: only `complex-curve-fit-gui` is installed without any required dependencies. Depending on if you are using pip or conda to manage your environment you should manually install the following additional packages:  
 
 - Using `pip`:
 
