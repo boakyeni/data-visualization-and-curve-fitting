@@ -109,7 +109,6 @@ def curve_fit_gui(
     ylabel="y-axis",
     absolute_sigma=False,
     jac=None,
-    showgui=True,
     **kwargs,
 ):
     """
@@ -206,7 +205,6 @@ def curve_fit_gui(
         ylabel,
         absolute_sigma,
         jac,
-        showgui,
         **kwargs,
     )
     return res

@@ -17,7 +17,7 @@ class Main:
         # y data is only set to None because dummy data generated in backend
         # make to return fit result
         # have option to get rid of guess line
-        curve_fit_gui(
+        printout = curve_fit_gui(
             None,
             self.xdata,
             None,

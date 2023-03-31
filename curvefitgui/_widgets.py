@@ -130,11 +130,24 @@ class PlotWidget(QtWidgets.QWidget):
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.toolbar.addSeparator()
 
+        """
+        Change Data Button
+        """
+        self.updateData = QtWidgets.QAction("Update Data")
+        self.updateData.setIconText("UPDATE DATA")
+        self.updateData.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
+        self.updateData.triggered.connect(self.update_data)
+
+        self.toolbar.addSeparator()
+
         self.ACshowselector = QtWidgets.QAction("Activate/Clear RangeSelector")
         self.ACshowselector.setIconText("RANGE SELECTOR")
         self.ACshowselector.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
         self.ACshowselector.triggered.connect(self._toggle_showselector)
 
+        self.toolbar.addSeparator()
+
+        self.toolbar.addAction(self.updateData)
         self.toolbar.addAction(self.ACshowselector)
 
         self.toolbar.addSeparator()
@@ -154,6 +167,9 @@ class PlotWidget(QtWidgets.QWidget):
 
     def _toggle_showselector(self):
         self.canvas.toggle_rangeselector()
+
+    def update_data(self):
+        return
 
 
 class PlotCanvas(FigureCanvas):
@@ -473,11 +489,11 @@ class PlotCanvas(FigureCanvas):
                     order = np.argsort(self.data.x)
                 else:
                     order = np.arange(0, len(self.data.x))
-                print("self.data.x", self.data.x, type(self.data.x))
-                print("self.residuals", self.residuals, type(self.residuals))
-                print("order slice", order[: len(self.residuals)], type(order))
-                print("len of mask", len(self.data.mask), type(self.data.mask))
-                print("self mask", self.data.mask)
+                # print("self.data.x", self.data.x, type(self.data.x))
+                # print("self.residuals", self.residuals, type(self.residuals))
+                # print("order slice", order[: len(self.residuals)], type(order))
+                # print("len of mask", len(self.data.mask), type(self.data.mask))
+                # print("self mask", self.data.mask)
 
                 """
                 Make a copy of data.x

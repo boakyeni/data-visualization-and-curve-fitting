@@ -171,7 +171,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 change to return result object
                 """
                 # update output
-                self.set_output((fitpars, fitcov))
+                self.set_output((fitpars, fitcov, result))
 
                 # update the widgets
                 self.modelview.update_values()
@@ -209,7 +209,6 @@ def execute_gui(
     ylabel,
     absolute_sigma,
     jac,
-    showgui,
     **kwargs
 ):
     """
@@ -220,6 +219,25 @@ def execute_gui(
         app = QtWidgets.QApplication([])
     else:
         app = QtWidgets.QApplication.instance()
+
+    is_complex = False if "complex" not in kwargs else kwargs["complex"]
+
+    showgui = True if "showgui" not in kwargs else kwargs["showgui"]
+
+    if not showgui:
+        afitter = Fitter(
+            f,
+            xdata,
+            ydata,
+            xerr,
+            yerr,
+            p0,
+            absolute_sigma,
+            jac,
+            is_complex,
+            **kwargs,
+        )
+        return afitter.fit()
 
     class CustomDialog(QtWidgets.QDialog):
         """
@@ -385,8 +403,6 @@ def execute_gui(
         dlg.is_complex,
         **kwargs,
     )
-    if not showgui:
-        return afitter.fit()
 
     MyApplication = MainWindow(afitter, xlabel, ylabel, **kwargs)
     MyApplication.show()
