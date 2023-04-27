@@ -1,7 +1,12 @@
 # import required packges
+from typing import Callable
 import warnings
 from collections import defaultdict
 import io
+import string
+from sympy.solvers import solve
+from sympy import symbols
+import re
 
 warnings.filterwarnings("ignore")
 
@@ -121,33 +126,48 @@ class PlotWidget(QtWidgets.QWidget):
     """Qt widget to hold the matplotlib canvas and the tools for interacting with the plots"""
 
     resized = QtCore.pyqtSignal()  # emits when the widget is resized
+    re_init = QtCore.pyqtSignal(
+        "PyQt_PyObject", "PyQt_PyObject", "PyQt_PyObject"
+    )  # emits when plot is updated
 
     def __init__(self, fitter, xlabel, ylabel, **kwargs):
         QtWidgets.QWidget.__init__(self)
-
         self.setLayout(QtWidgets.QVBoxLayout())
         self.canvas = PlotCanvas(fitter, xlabel, ylabel, **kwargs)
         self.toolbar = NavigationToolbar(self.canvas, self)
-        self.toolbar.addSeparator()
+        self.selected_curve = None
+        self.initial_complex_curve = (
+            self.canvas.ax1.get_lines()[0].get_label()
+            if not self.canvas.fitter.is_complex
+            else self.canvas.ax1.get_lines()[1].get_label()
+        )  # This data is an edge case of selected curve that needs to be saved
+        # print("init select", self.selected_curve)
+        self.selected_model = None
+        self.input_func = None
+        self.data_map = {}
 
-        """
-        Change Data Button
-        """
-        self.updateData = QtWidgets.QAction("Update Data")
-        self.updateData.setIconText("UPDATE DATA")
-        self.updateData.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
-        self.updateData.triggered.connect(self.update_data)
+        self.hideRes = QtWidgets.QAction("TOGGLE RESIDUAL")
+        self.hideRes.setIconText("TOGGLE RESIDUAL")
+        self.hideRes.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
+        self.hideRes.triggered.connect(self.toggle_residual_visibility)
 
-        self.toolbar.addSeparator()
+        self.switchData = QtWidgets.QAction("Switch Data")
+        self.switchData.setIconText("SELECT DATA")
+        self.switchData.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
+        self.switchData.triggered.connect(self.switch_data)
 
         self.ACshowselector = QtWidgets.QAction("Activate/Clear RangeSelector")
         self.ACshowselector.setIconText("RANGE SELECTOR")
         self.ACshowselector.setFont(QtGui.QFont("Times", 12, QtGui.QFont.Bold))
         self.ACshowselector.triggered.connect(self._toggle_showselector)
+        self.toolbar.addAction(self.hideRes)
 
         self.toolbar.addSeparator()
 
-        self.toolbar.addAction(self.updateData)
+        self.toolbar.addAction(self.switchData)
+
+        self.toolbar.addSeparator()
+
         self.toolbar.addAction(self.ACshowselector)
 
         self.toolbar.addSeparator()
@@ -157,6 +177,66 @@ class PlotWidget(QtWidgets.QWidget):
         self.resized.connect(
             self.update_plot
         )  # update plot when window is resized to fit plot in window
+
+        def linear(x, a, b):
+            """
+            linear
+            function: ax + b
+            """
+
+            return a * x + b
+
+        def exp_decay(x, a, b, c):
+            """
+            exponential decay
+            function: a * exp(-x / b) + c
+            a : amplitude
+            b : rate
+            c : offset
+            """
+            return a * np.exp(-x / b) + c
+
+        def cosine_function(x, a, b, c, d):
+            """
+            y = a * cos(b * x + c) + d
+            """
+            return a * np.cos(b * x + c) + d
+
+        def decaying_oscillation(x, a, b, c, d, e):
+            """
+            y = a * exp(-x / b) * cos(c * x + d) + e
+            """
+            return a * np.exp(-x / b) * np.cos(c * x + d) + e
+
+        def decaying_oscillation2(x, a, b, c, d, e):
+            """
+            y = a * exp(-x / b)^2 * cos(c * x + d) + e
+            """
+            return a * (np.exp(-x / b) ** 2) * np.cos(c * x + d) + e
+
+        def euler(x, a):
+            """
+            Euler's
+            y = a * exp(i * x)
+            """
+            return a * (np.exp(1j * (x)))
+
+        def complex_function(x, a, b, c, d):
+            """
+            complex exp
+            y = a * exp(i * (b * w + c)) + d
+            """
+            return a * np.exp(1j * (b * x + c)) + d
+
+        self.function_map = {
+            "y = ax + b": linear,
+            "y = a * exp(-x / b) + c": exp_decay,
+            "y = a * cos(b*x + c) + d": cosine_function,
+            "y = a * exp(-x / b) * cos(c * x + d) + e": decaying_oscillation,
+            "y = a * exp(-x / b)^2 * cos(c * x + d) + e": decaying_oscillation2,
+            "y = a * exp(i * x)": euler,
+            "y = a * exp(i * (b * w + c)) + d": complex_function,
+        }
 
     def resizeEvent(self, event):
         self.resized.emit()
@@ -168,8 +248,156 @@ class PlotWidget(QtWidgets.QWidget):
     def _toggle_showselector(self):
         self.canvas.toggle_rangeselector()
 
+    def toggle_residual_visibility(self):
+        if not self.canvas.ax2.get_visible():
+            self.canvas.ax1.set(xlabel=None)
+        else:
+            self.canvas.ax1.set_xlabel(
+                self.canvas.xlabel,
+                fontname=settings["TEXT_FONT"],
+                fontsize=settings["TEXT_SIZE"],
+            )
+        self.canvas.ax2.set_visible(not self.canvas.ax2.get_visible())
+        self.canvas.redraw()
+
     def update_data(self):
-        return
+        x = np.array([1, 2, 3])
+        y = np.array([4, 5, 6])
+        self.canvas.ax1.plot(
+            x,
+            y,
+            marker="o",
+            lw=0,
+            label="data2",
+        )
+        self.canvas.ax1.legend()
+        self.canvas.redraw()
+
+        # dialog = QtWidgets.QDialog()
+        # dialog.setWindowTitle("Update Data")
+        # layout = QtWidgets.QVBoxLayout()
+
+        # ind_layout = QtWidgets.QHBoxLayout()
+        # ind_label = QtWidgets.QLabel("Independent Values: ")
+        # self.independent_variable = QtWidgets.QLineEdit()
+        # ind_layout.addWidget(ind_label)
+        # ind_layout.addWidget(self.independent_variable)
+
+        # dep_layout = QtWidgets.QHBoxLayout()
+        # dep_label = QtWidgets.QLabel("Dependent Values: ")
+        # self.dependent_variable = QtWidgets.QLineEdit()
+        # dep_layout.addWidget(dep_label)
+        # dep_layout.addWidget(self.dependent_variable)
+
+        # button = QtWidgets.QPushButton("Update")
+        # # button.clicked.connect(self.re_init_plot)
+
+        # layout.addLayout(ind_layout)
+        # layout.addLayout(dep_layout)
+        # layout.addWidget(button)
+
+        # button.clicked.connect(dialog.close)
+
+        # dialog.setLayout(layout)
+        # dialog.exec_()
+
+    def switch_data(self):
+        def save_complex_data():
+            """
+            before switching curve add complex data to a map of label to x data and y data
+            Since complex plots y real and imag, xdata is lost in matplotlib
+            """
+
+            if self.canvas.fitter.is_complex:
+
+                if self.selected_curve:
+                    self.data_map[self.selected_curve] = (
+                        self.canvas.fitter.data.x,
+                        self.canvas.fitter.data.y,
+                    )
+                else:
+                    self.data_map[self.initial_complex_curve] = (
+                        self.canvas.fitter.data.x,
+                        self.canvas.fitter.data.y,
+                    )
+
+        def get_selected_curve():
+            save_complex_data()
+            # print(self.data_map[self.selected_curve])
+            self.selected_curve = self.combobox.currentText()
+
+        def get_selected_model():
+            self.selected_model = self.model_combobox.currentText()
+
+        # print(self.canvas.ax1.get_lines()[1].get_label())
+        self.dialog = QtWidgets.QDialog()
+        self.dialog.setWindowTitle("Switch Data")
+        self.layout = QtWidgets.QVBoxLayout()
+
+        self.combobox = QtWidgets.QComboBox()
+        self.model_combobox = QtWidgets.QComboBox()
+        self.user_input = QtWidgets.QLineEdit()
+        self.button = QtWidgets.QPushButton("Select")
+        self.button.clicked.connect(get_selected_curve)
+        self.button.clicked.connect(get_selected_model)
+        self.button.clicked.connect(self.re_init_model)
+        # self.button.clicked.connect(self.create_callable)
+        self.button.clicked.connect(self.dialog.close)
+
+        for item in self.canvas.ax1.get_lines():
+            if not re.match(r"fitted curve.*?", item.get_label()):
+                self.combobox.addItem(item.get_label())
+            # else:
+            #     # print(item)
+
+        # for item in self.canvas.ax1.get_lines():
+        #     if item.get_label() == "fitted_curve":
+        #         self.combobox.addItem(item.get_label())
+
+        self.model_combobox.addItem(
+            self.canvas.fitter.orig_model.func.__name__
+            if self.canvas.fitter.orig_model.func.__name__
+            else "custom_user_function"
+        )
+        for item in self.function_map:
+            self.model_combobox.addItem(item)
+
+        self.layout.addWidget(self.combobox)
+        self.layout.addWidget(self.model_combobox)
+        # self.layout.addWidget(self.user_input)
+        self.layout.addWidget(self.button)
+
+        self.dialog.setLayout(self.layout)
+        self.dialog.exec_()
+
+    def re_init_model(self, event):
+        new_model = self.canvas.fitter.orig_model.func
+        self.canvas.fitter.is_complex = self.canvas.fitter.orig_complex
+        if self.selected_model != self.canvas.fitter.orig_model.func.__name__:
+            new_model = self.function_map[self.selected_model]
+            if "i" in self.selected_model:
+                self.canvas.fitter.is_complex = True
+            else:
+                self.canvas.fitter.is_complex = False
+        self.re_init.emit(new_model, None, None)
+
+    # Not fully implemented supposed to allow custom user input during execution
+    def custom_user_function(self, *args):
+        n = len(args) - 1
+        symbol_str = "x" + ":" + str(n)
+        return solve(self.input_func, symbols(symbol_str))
+
+    def create_callable(self):
+        if len(self.user_input.text()) > 2:
+            new_args = ["x"]
+            self.input_func = self.user_input.text()
+            for c in self.input_func:
+                if c in string.ascii_uppercase:
+                    new_args.append(c)
+            self.function_map[self.input_func] = self.custom_user_function(
+                *new_args
+            )
+            self.model_combobox.addItem(self.input_func)
 
 
 class PlotCanvas(FigureCanvas):
@@ -177,16 +405,19 @@ class PlotCanvas(FigureCanvas):
 
     def __init__(self, fitter, xlabel, ylabel, **kwargs):
         self.fitter = fitter
+        self.xlabel = xlabel
         self.data = fitter.data  # contains the x, y and error data
         self.fitline = None  # contains the fitline if available
         self.residuals = None  # contains the residuals if available
         self.complex_residuals = None
         self.initial_guess_line = None
         self.kwargs = kwargs
+        self.additional_data = None
         self.fitline_kwargs = defaultdict(str)
         self.complex = (
             False if "complex" not in self.kwargs else self.kwargs["complex"]
         )
+        # print(id(self.fitter))
 
         # Get Axis titles
         self.ax1_title = (
@@ -199,7 +430,9 @@ class PlotCanvas(FigureCanvas):
             del self.kwargs["method"]
         if "complex" in self.kwargs:
             del self.kwargs["complex"]
-
+        if "add" in self.kwargs:
+            self.additional_data = self.kwargs["add"]
+            del self.kwargs["add"]
         # Separate Fitline kwargs from data kwargs, at this point kwargs and self.kwargs are same thing
         if "fitline_color" in self.kwargs:
             self.fitline_kwargs["color"] = kwargs["fitline_color"]
@@ -282,7 +515,7 @@ class PlotCanvas(FigureCanvas):
             [], [], color="k", marker=".", lw=1
         )
         self.zero_res = None  # holder for a dashed hline to indicate zero in the residual plot
-
+        self.plot_additional_data()
         # create legend
         self.ax1.legend(
             loc="best",
@@ -315,11 +548,11 @@ class PlotCanvas(FigureCanvas):
         """
         # populate plotlines if not complex data since different plot interpretation needed for complex values (the clear circles)
         if not self.fitter.is_complex:
-            self.data_line.set_data(self.data.x, self.data.y)
+            self.data_line.set_data(self.fitter.data.x, self.fitter.data.y)
         else:
             self.data_line.remove()
             (self.data_line,) = self.plot_complex(
-                self.data.y, "o", **self.kwargs
+                self.fitter.data.y, "o", **self.kwargs
             )
             self.ax1.legend()
 
@@ -395,13 +628,17 @@ class PlotCanvas(FigureCanvas):
 
     def toggle_rangeselector(self):
         if self.range_selector is None:
-            if self.complex:
+            if self.fitter.is_complex:
                 self.range_selector = RangeSelector(
-                    self.ax1, np.min(self.data.y), np.max(self.data.y)
+                    self.ax1,
+                    np.min(self.fitter.data.y.real),
+                    np.max(self.fitter.data.y.real),
                 )
             else:
                 self.range_selector = RangeSelector(
-                    self.ax1, np.min(self.data.x), np.max(self.data.x)
+                    self.ax1,
+                    np.min(self.fitter.data.x),
+                    np.max(self.fitter.data.x),
                 )
             self.redraw()
         else:
@@ -430,9 +667,9 @@ class PlotCanvas(FigureCanvas):
 
     def get_range(self):
         if self.range_selector is None:
-            self.data.set_mask(-np.inf, np.inf)
+            self.fitter.data.set_mask(-np.inf, np.inf)
         else:
-            self.data.set_mask(*self.range_selector.get_range())
+            self.fitter.data.set_mask(*self.range_selector.get_range())
 
     def plot_complex(self, data, *args, **kwargs):
         """
@@ -450,6 +687,7 @@ class PlotCanvas(FigureCanvas):
         # update the residuals and/or fitline if present
 
         if self.fitter.model_result and self.fitter.is_complex:
+            # print(id(self.fitter))
             fit_s21 = self.fitter.model_result.eval(
                 params=self.fitter.model_result.params, x=self.fitter.data.x
             )
@@ -462,7 +700,7 @@ class PlotCanvas(FigureCanvas):
                 self.initial_guess_line.remove()
                 self.initial_guess_line = None
 
-            self.ax2.lines.clear()
+            # self.ax2.lines.clear()
             # if self.complex_residuals:
             #     self.complex_residuals.cla()
 
@@ -471,12 +709,36 @@ class PlotCanvas(FigureCanvas):
             (self.fitted_line,) = self.plot_complex(
                 fit_s21, "--k", **self.fitline_kwargs
             )
-            self.complex_residuals = self.fitter.model_result.plot_residuals(
-                ax=self.ax2,
-                datafmt=".-k",
-                parse_complex="abs",
-                data_kws={"label": "residual"},
-            )
+            """
+            Lmfit had wierd residuals fro complex values
+            """
+            # self.complex_residuals = self.fitter.model_result.plot_residuals(
+            #     ax=self.ax2,
+            #     datafmt=".-k",
+            #     parse_complex="abs",
+            #     data_kws={"label": "residual"},
+            # )
+            if self.residuals is not None:
+                # if the zero residual line is not yet created, do so
+                if self.zero_res is None:
+                    self.ax2.axhline(y=0, linestyle="--", color="black")
+
+                # sort data if required
+                if settings["SORT_RESIDUALS"]:
+                    order = np.argsort(self.fitter.data.y.real)
+                else:
+                    order = np.arange(0, len(self.fitter.data.y.real))
+
+                data_copy = np.array([])
+                for i in range(len(self.fitter.data.y)):
+                    if self.fitter.data.mask[i] == True:
+                        data_copy = np.append(
+                            data_copy, [self.fitter.data.y.real[i]]
+                        )
+                self.residual_line.set_data(
+                    data_copy[order[: len(self.residuals)]],
+                    self.residuals.real[order[: len(self.residuals)]],
+                )
             self.ax1.legend()
         else:
             if self.residuals is not None:
@@ -486,9 +748,9 @@ class PlotCanvas(FigureCanvas):
 
                 # sort data if required
                 if settings["SORT_RESIDUALS"]:
-                    order = np.argsort(self.data.x)
+                    order = np.argsort(self.fitter.data.x)
                 else:
-                    order = np.arange(0, len(self.data.x))
+                    order = np.arange(0, len(self.fitter.data.x))
                 # print("self.data.x", self.data.x, type(self.data.x))
                 # print("self.residuals", self.residuals, type(self.residuals))
                 # print("order slice", order[: len(self.residuals)], type(order))
@@ -502,9 +764,11 @@ class PlotCanvas(FigureCanvas):
                 use that copy in the residual line set data.
                 """
                 data_copy = np.array([])
-                for i in range(len(self.data.x)):
-                    if self.data.mask[i] == True:
-                        data_copy = np.append(data_copy, [self.data.x[i]])
+                for i in range(len(self.fitter.data.x)):
+                    if self.fitter.data.mask[i] == True:
+                        data_copy = np.append(
+                            data_copy, [self.fitter.data.x[i]]
+                        )
                 self.residual_line.set_data(
                     data_copy[order[: len(self.residuals)]],
                     self.residuals[order[: len(self.residuals)]],
@@ -530,6 +794,13 @@ class PlotCanvas(FigureCanvas):
 
         # draw the plot
         self.redraw()
+
+    def plot_additional_data(self):
+        if self.additional_data:
+            for item in self.additional_data:
+                self.ax1.plot(
+                    item[0], item[1], label=item[2], marker="o", lw=0
+                )
 
     def redraw(self):
         # self.fig.canvas.draw()

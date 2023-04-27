@@ -11,7 +11,7 @@ exec(open("./curvefitgui/_version.py").read())
 
 # This call to setup() does all the work
 setup(
-    name="complex-curve-fit-gui",
+    name="complex_curve_fit_gui",
     version=__version__,
     description="GUI for lmfit",
     long_description=README,
@@ -31,6 +31,7 @@ setup(
     package_data={
         "curvefitgui": ["config.txt"],
     },
+    zip_safe=True,
     # conda
     # install_requires=["matplotlib", "numpy", "scipy", "pyqt", "qtpy"], # need to check versions
     # PyPi

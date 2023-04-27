@@ -91,7 +91,6 @@ def linear_fit_gui(
         xlabel,
         ylabel,
         absolute_sigma,
-        jac,
         showgui,
         **kwargs,
     )
@@ -204,7 +203,6 @@ def curve_fit_gui(
         xlabel,
         ylabel,
         absolute_sigma,
-        jac,
         **kwargs,
     )
     return res

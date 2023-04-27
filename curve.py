@@ -1,5 +1,5 @@
 import numpy as np
-
+import os
 from curvefitgui import curve_fit_gui
 
 
@@ -9,7 +9,7 @@ class Main:
         This function are only here to create test data
         """
 
-        def exp_decay(x, a, b, c):
+        def decay(x, a, b, c):
             return a * np.exp(-x / b) + c
 
         self.xdata = np.linspace(0, 4, 50)
@@ -17,16 +17,18 @@ class Main:
         # y data is only set to None because dummy data generated in backend
         # make to return fit result
         # have option to get rid of guess line
+
         printout = curve_fit_gui(
             None,
             self.xdata,
             None,
-            title="Complex Graph",
+            title="Sin Graph",
             xlabel="y axis",
             ylabel="Imaginary",
             fitline_color="red",
             color="black",
         )
+        # add=[(np.array([1, 2, 3]), np.array([4, 5, 6]), "data2")]
 
 
 w = Main()

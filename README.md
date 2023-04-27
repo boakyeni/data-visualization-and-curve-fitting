@@ -12,11 +12,11 @@ The GUI is supported on Python 3.7 and above.
 
 - Using `pip`:
 
-      pip install numpy scipy matplotlib PyQt5
+      pip install numpy scipy matplotlib PyQt5 lmfit sympy
 
 - Using `conda` (required for M1 Mac):    
 
-      conda install numpy scipy matplotlib qtpy pyqt
+      conda install numpy scipy matplotlib qtpy pyqt && conda install -c conda-forge lmfit
 
 ### Getting Started
 1. If on MacOS M1 a conda environment will be needed
@@ -32,6 +32,12 @@ The GUI is supported on Python 3.7 and above.
        `curve_fit_gui(None,xdata,ydata)`
 5. Optionally disable gui and immediately get fit results as tuple (popt, pcov, result) where popt is an array of the best-fit parameters, pcov is an array of the confidence intervals, and result is an lmfit ModelResult object. [Model Result](https://lmfit.github.io/lmfit-py/model.html#lmfit.model.ModelResult)
        `curve_fit_gui(function,xdata,ydata, showgui=False)`
+
+### Open Multiple Windows
+ - Appending `&` to the end of the command used to run program will give access to current terminal, allowing for another window to be openned. Ex: `python3 curve.py&`
+
+### Plot multiple dataset on single window
+ - Use the keyword argument `add` and format argument as an array of tuples i.e `[(np.array, np.array, string)]` where the first index is xdata, the next in y-data, and the last is a label for the data
 
 
 ### curve_fit_gui function:
@@ -73,6 +79,9 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
  - To make a user defined function create a function and pass to curve_fit_gui as f. For example: 
  ```python
        def linear(x, a, b, c): 
+              '''
+              y = a * x + b
+              '''
               return y = a * x + b
 
        curve_fit_gui(linear, xdata, ydata)

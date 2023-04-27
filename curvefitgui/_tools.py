@@ -1,11 +1,12 @@
 import inspect
 from dataclasses import dataclass, field
 from typing import Any, List
-
+import copy
 import numpy as np
 from lmfit import Model
 from scipy import stats
 from scipy.optimize import OptimizeWarning, curve_fit
+
 
 from ._settings import settings
 
@@ -29,7 +30,6 @@ class FitModel:
     """
 
     func: Any
-    jac: Any
     weight: str
     # lmfit_model: Model
     # lmfit_parameters: Any
@@ -102,14 +102,13 @@ class Fitter:
         yerr,
         p0,
         absolute_sigma,
-        jac,
         is_complex,
         **kwargs,
     ):
 
         self.kwargs = kwargs
         self.data = self._init_data(xdata, ydata, xerr, yerr)
-        self.model = self._init_model(func, p0, absolute_sigma, jac)
+        self.model = self._init_model(func, p0, absolute_sigma)
         # Model Result from lmfit
         self.model_result = None
         self.fit_is_valid = False  # becomes True a a valid fit is computed
@@ -119,6 +118,8 @@ class Fitter:
         self.method = "leastsq"
         if "method" in kwargs:
             self.method = kwargs["method"]
+        self.orig_model = copy.deepcopy(self.model)
+        self.orig_complex = copy.deepcopy(is_complex)
 
     def _init_data(self, x, y, xe, ye):
 
@@ -144,7 +145,7 @@ class Fitter:
 
         return FitData(x, y, xe, ye)
 
-    def _init_model(self, func, p0, absolute_sigma, jac):
+    def _init_model(self, func, p0, absolute_sigma):
         # validate function
         if not callable(func):
             raise Exception("Not a valid fit function")
@@ -177,7 +178,7 @@ class Fitter:
         else:
             description = strip_leading_spaces(func.__doc__)
 
-        afitmodel = FitModel(func, jac, weight, fitpars, description)
+        afitmodel = FitModel(func, weight, fitpars, description)
         return afitmodel
 
     def fit(self):
@@ -215,13 +216,13 @@ class Fitter:
             pF=pF,
             method=self.method,
             absolute_sigma=absolute_sigma,
-            jac=self.model.jac,
         )
         # lmfit model result
         self.model_result = result
 
         # process results
         self.fit_is_valid = True
+        # print("cov", pcov)
         stderrors = np.sqrt(np.diag(pcov))
         for fitpar, value, stderr in zip(self.model.fitpars, popt, stderrors):
             fitpar.value = value
@@ -272,9 +273,9 @@ class Fitter:
             return None
         if not self.model_result:
             return None
-        # return self.data.y - self.model.evaluate(self.data.x)
+        return self.data.y - self.model.evaluate(self.data.x)
         # lmfit
-        return self.model_result.residual
+        # return self.model_result.residual
 
     def _degrees_of_freedom(self):
         return int(self.data.get_numfitpoints() - self.model.get_numfitpars())
@@ -315,9 +316,17 @@ class Fitter:
             # no error data so only one option remains
             return self.WEIGHTOPTIONS[0:1]
 
+    def change_data(self, x, y, xe, ye):
+        self.data = self._init_data(x, y, xe, ye)
+        # print(self)
+
+    def change_model(self, func, p0, absolute_sigma):
+        self.model = self._init_model(func, p0, absolute_sigma)
+        # print(self)
+
 
 def curve_fit_wrapper(
-    model, *pargs, p0=None, pF=None, jac=None, method="leastsq", **kwargs
+    model, *pargs, p0=None, pF=None, method="slsqp", **kwargs
 ):
     """
     wrapper around the scipy curve_fit() function to allow parameters to be fixed
@@ -350,18 +359,6 @@ def curve_fit_wrapper(
         locals(),
     )
 
-    # make a string defining the new jacobian function (if specified) as a lambda expression and evaluate to function
-    if callable(jac):
-        indices = np.array(
-            [index for index, value in enumerate(pF) if value == False]
-        )
-        fit_jac = eval(
-            f"lambda {', '.join(newfunc_args)} : jac({', '.join(orifunc_args)})[:, indices]",
-            locals(),
-        )
-    else:
-        fit_jac = jac
-
     # populate a list of initial values for free fit-parameters
     p0_fit = np.array([p for p, fix in zip(p0, pF) if not fix])
 
@@ -386,10 +383,13 @@ def curve_fit_wrapper(
         calc_covar=True,
         nan_policy="omit",
         method=method,
+        max_nfev=100000000,
     )
 
     popt = np.array(list(result.best_values.values()))
-    cov = result.covar
+    # print("cov values", result.covar)
+    cov = np.array(result.covar)
+    # print("cov values after arrayed", cov)
 
     # rebuild the popt and cov to include fixed parameters
     p0_fix = [p for p, fix in zip(p0, pF) if fix]  # values of fixed parameters
@@ -408,6 +408,7 @@ def curve_fit_wrapper(
             cov, id, 0, axis=1
         )  # add zero rows and columns for fixed par
         cov = np.insert(cov, id, 0, axis=0)
+
     # params here temporarily, in future move lmfit model to fitmodel so that params does not need to be returned here
     return popt, cov, result
 

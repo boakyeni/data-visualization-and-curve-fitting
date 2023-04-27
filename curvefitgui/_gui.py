@@ -4,6 +4,7 @@ import sys
 import warnings
 from inspect import signature
 
+
 import numpy as np
 from PyQt5 import QtCore, QtWidgets
 from scipy.optimize import OptimizeWarning
@@ -30,11 +31,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.xlabel, self.ylabel = xlabel, ylabel
         self.output = (None, None)
         self.xerrorwarning = settings["XERRORWARNING"]
+        self.kwargs = kwargs
         self.initGUI(**kwargs)
         # call fit here if complex
         # if self.fitter.is_complex:
         #     self.fit()
         self.plotwidget.update_plot()
+        self.OG_model = self.fitter.model  # original model/ user entered model
 
     def closeEvent(self, event):
         """needed to properly quit when running in IPython console / Spyder IDE"""
@@ -59,6 +62,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ylabel,
             **kwargs,
         )  # holds the plot
+
+        self.plotwidget.re_init.connect(
+            self.refresh
+        )  # signal for from update plot button
+
         self.modelview = ModelWidget(
             self.fitter.model, self.fitter.get_weightoptions()
         )  # shows the model and allows users to set fitproperties
@@ -78,15 +86,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # create a frame with a vertical layout to organize the modelview, fitbutton and reportview
         self.fitcontrolframe = QtWidgets.QGroupBox()
-        fitcontrollayout = QtWidgets.QVBoxLayout()
+        self.fitcontrollayout = QtWidgets.QVBoxLayout()
         for widget in (
             self.modelview,
             self.buttons,
             self.reportview,
             self.quitbutton,
         ):
-            fitcontrollayout.addWidget(widget)
-        self.fitcontrolframe.setLayout(fitcontrollayout)
+            self.fitcontrollayout.addWidget(widget)
+        self.fitcontrolframe.setLayout(self.fitcontrollayout)
 
         # putting it all together: Setup the main layout
         mainlayout = QtWidgets.QHBoxLayout(self._main)
@@ -147,7 +155,31 @@ class MainWindow(QtWidgets.QMainWindow):
                 "Not a valid input initial parameter values", "critical"
             )
             return None
+        # print("selected", self.plotwidget.selected_curve)
+        # print("here", self.plotwidget.canvas.ax1.get_lines())
 
+        try:
+            if self.plotwidget.selected_curve is not None:
+                selected_line = next(
+                    x
+                    for x in self.plotwidget.canvas.ax1.get_lines()
+                    if x.get_label() == self.plotwidget.selected_curve
+                )
+                # print("sel", selected_line)
+
+                if not self.plotwidget.canvas.fitter.is_complex:
+                    (current_x, current_y) = selected_line.get_data()
+
+                else:
+                    (current_x, current_y) = self.plotwidget.data_map[
+                        selected_line.get_label()
+                    ]
+                self.fitter.change_data(current_x, current_y, None, None)
+                # print("after change", self.fitter.data)
+
+        except Exception as e:
+            # print("exp", e)
+            self.showdialog("Can't find plot", "critical")
         # update fitrange
         self.plotwidget.canvas.get_range()
 
@@ -161,6 +193,7 @@ class MainWindow(QtWidgets.QMainWindow):
             warnings.simplefilter(
                 "error", OptimizeWarning
             )  # make sure the OptimizeWarning is raised as an exception
+
             try:
                 fitpars, fitcov, result = self.fitter.fit()
             except (ValueError, RuntimeError, OptimizeWarning):
@@ -196,20 +229,43 @@ class MainWindow(QtWidgets.QMainWindow):
             text = text + "\n" + value_to_string(n, v, e, f)
         return text
 
+    def refresh(self, model, y):
+        """
+        retrieves data from update signal, plotwidget.re_init(), and updates gui according to user input
+        called around line 64
+
+        """
+        if model == self.OG_model.func.__name__ or model is None:
+            self.fitter.change_model(self.OG_model.func, None, None)
+        else:
+            self.fitter.change_model(model, None, None)
+        self.modelview = ModelWidget(
+            self.fitter.model, self.fitter.get_weightoptions()
+        )
+        # print("refresh", id(self.fitter))
+
+        # self.fitter.data = self.fitter._init_data(x, y, None, None)
+        # self.ylabel = "IM"
+        # self.fitcontrollayout = QtWidgets.QVBoxLayout()
+
+        child = self.fitcontrollayout.takeAt(0)
+        if child.widget():
+            child.widget().setParent(None)
+
+        for widget in (
+            self.modelview,
+            self.buttons,
+            self.reportview,
+            self.quitbutton,
+        ):
+            self.fitcontrollayout.addWidget(widget)
+
+        self.fitcontrolframe
+
 
 # add is_complex parameter
 def execute_gui(
-    f,
-    xdata,
-    ydata,
-    xerr,
-    yerr,
-    p0,
-    xlabel,
-    ylabel,
-    absolute_sigma,
-    jac,
-    **kwargs
+    f, xdata, ydata, xerr, yerr, p0, xlabel, ylabel, absolute_sigma, **kwargs
 ):
     """
     helper function that executes the GUI with an instance of the fitter class
@@ -233,7 +289,6 @@ def execute_gui(
             yerr,
             p0,
             absolute_sigma,
-            jac,
             is_complex,
             **kwargs,
         )
@@ -344,10 +399,14 @@ def execute_gui(
             )
             self.func = self.function_map[self.combobox.currentText()]
 
-    dlg = CustomDialog()
-    dlg.exec_()
     if f is None:
+        dlg = CustomDialog()
+        dlg.exec_()
         f = dlg.func
+        # Here so that complex bool passes through to widgets
+        if dlg.is_complex:
+            kwargs["complex"] = True
+            is_complex = True
 
     """
     !!!
@@ -383,13 +442,11 @@ def execute_gui(
         test_yerr = 0.2 * np.ones_like(xdata)
         y_noise = test_yerr * rng.normal(size=xdata.size)
         ydata = y + y_noise
+        ydata = np.asarray(ydata)
 
     """
     gonna have to add sigma to this and other places
     """
-    # Here so that complex bool passes through to widgets
-    if dlg.is_complex:
-        kwargs["complex"] = True
 
     afitter = Fitter(
         f,
@@ -399,11 +456,11 @@ def execute_gui(
         yerr,
         p0,
         absolute_sigma,
-        jac,
-        dlg.is_complex,
+        is_complex,
         **kwargs,
     )
 
+    # print("original", afitter.data)
     MyApplication = MainWindow(afitter, xlabel, ylabel, **kwargs)
     MyApplication.show()
     app.exec_()

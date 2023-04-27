@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: complex-curve-fit-gui
-Version: 1.0.7
+Version: 1.1.3
 Summary: GUI for lmfit
 Home-page: https://github.com/boakyeni/data-visualization-and-curve-fitting
 Author: Kojo Nimako
@@ -46,6 +46,12 @@ The GUI is supported on Python 3.7 and above.
        `curve_fit_gui(None,xdata,ydata)`
 5. Optionally disable gui and immediately get fit results as tuple (popt, pcov, result) where popt is an array of the best-fit parameters, pcov is an array of the confidence intervals, and result is an lmfit ModelResult object. [Model Result](https://lmfit.github.io/lmfit-py/model.html#lmfit.model.ModelResult)
        `curve_fit_gui(function,xdata,ydata, showgui=False)`
+
+### Open Multiple Windows
+ - Appending `&` to the end of the command used to run program will give access to current terminal, allowing for another window to be openned. Ex: `python3 curve.py&`
+
+### Plot multiple dataset on single window
+ - Use the keyword argument `add` and format argument as an array of tuples i.e `[(np.array, np.array, string)]` where the first index is xdata, the next in y-data, and the last is a label for the data
 
 
 ### curve_fit_gui function:
