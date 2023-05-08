@@ -690,14 +690,19 @@ class PlotCanvas(FigureCanvas):
                     order = np.arange(0, len(self.fitter.data.y.real))
 
                 data_copy = np.array([])
+                order_copy = []
                 for i in range(len(self.fitter.data.y)):
                     if self.fitter.data.mask[i] == True:
                         data_copy = np.append(
                             data_copy, [self.fitter.data.y.real[i]]
                         )
+                for i in range(len(self.fitter.data.y)):
+                    if self.fitter.data.mask[i] == True:
+                        order_copy.append(order[i])
+
                 self.residual_line.set_data(
-                    data_copy[order[: len(self.residuals)]],
-                    self.residuals.real[order[: len(self.residuals)]],
+                    self.fitter.data.y.real[order_copy[:]],
+                    self.residuals.real[order_copy[:]],
                 )
             self.ax1.legend()
         else:
@@ -711,6 +716,7 @@ class PlotCanvas(FigureCanvas):
                     order = np.argsort(self.fitter.data.x)
                 else:
                     order = np.arange(0, len(self.fitter.data.x))
+                # print("order", order)
                 # print("self.data.x", self.data.x, type(self.data.x))
                 # print("self.residuals", self.residuals, type(self.residuals))
                 # print("order slice", order[: len(self.residuals)], type(order))
@@ -724,14 +730,22 @@ class PlotCanvas(FigureCanvas):
                 use that copy in the residual line set data.
                 """
                 data_copy = np.array([])
+                # for range selection
+                order_copy = []
+
                 for i in range(len(self.fitter.data.x)):
                     if self.fitter.data.mask[i] == True:
                         data_copy = np.append(
                             data_copy, [self.fitter.data.x[i]]
                         )
+
+                for i in range(len(self.fitter.data.x)):
+                    if self.fitter.data.mask[i] == True:
+                        order_copy.append(order[i])
+
                 self.residual_line.set_data(
-                    data_copy[order[: len(self.residuals)]],
-                    self.residuals[order[: len(self.residuals)]],
+                    data_copy[order_copy[:]],
+                    self.residuals[order_copy[:]],
                 )
 
                 # self.residual_line.set_data(

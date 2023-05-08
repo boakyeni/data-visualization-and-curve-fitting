@@ -16,7 +16,7 @@ The GUI is supported on Python 3.7 and above.
 
 - Using `conda` (required for M1 Mac):    
 
-      conda install numpy scipy matplotlib qtpy pyqt && conda install -c conda-forge lmfit
+      conda install numpy scipy matplotlib qtpy sympy pyqt && conda install -c conda-forge lmfit
 
 ### Getting Started
 1. If on MacOS M1 a conda environment will be needed
@@ -64,6 +64,13 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
         initial values for fit parameters, if not specified 1 is used for each parameter, if specified length must be >= number of fit parameters else program crashes upon fit
  - method : string, optional
        desired fit method for lmfit model, default is "least squares"
+       These are the possible values for keyword parameter method
+       – "leastsq" : Levenberg-Marquardt def ault
+       – "least_squares" : Least-Squares minimization, using Trust Region Reflective method
+       – "basinhopping" : basinhopping
+       – "ampgo" : Adaptive Memory Programming for Global Optimization
+       – "brute" : brute force method
+       – "slsqp" : Sequential Linear Squares Programming
  - showgui : boolean, optional (default=True)
         if True, the gui is shown, otherwise not
  - absolute_sigma : boolean, optional
