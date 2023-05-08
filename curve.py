@@ -1,5 +1,4 @@
 import numpy as np
-import os
 from curvefitgui import curve_fit_gui
 
 
@@ -9,8 +8,8 @@ class Main:
         This function are only here to create test data
         """
 
-        def decay(x, a, b, c):
-            return a * np.exp(-x / b) + c
+        def cos(x, a, b, c, d):
+            return a * np.cos(b * x + c) + d
 
         self.xdata = np.linspace(0, 4, 50)
 
@@ -27,6 +26,8 @@ class Main:
             ylabel="Imaginary",
             fitline_color="red",
             color="black",
+            method="leastsq",
+            p0=[3, 3, 3, 3, 3],
         )
         # add=[(np.array([1, 2, 3]), np.array([4, 5, 6]), "data2")]
 

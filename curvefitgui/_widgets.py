@@ -178,6 +178,7 @@ class PlotWidget(QtWidgets.QWidget):
             self.update_plot
         )  # update plot when window is resized to fit plot in window
 
+        # functions to switch to
         def linear(x, a, b):
             """
             linear
@@ -259,47 +260,6 @@ class PlotWidget(QtWidgets.QWidget):
             )
         self.canvas.ax2.set_visible(not self.canvas.ax2.get_visible())
         self.canvas.redraw()
-
-    def update_data(self):
-        x = np.array([1, 2, 3])
-        y = np.array([4, 5, 6])
-        self.canvas.ax1.plot(
-            x,
-            y,
-            marker="o",
-            lw=0,
-            label="data2",
-        )
-        self.canvas.ax1.legend()
-        self.canvas.redraw()
-
-        # dialog = QtWidgets.QDialog()
-        # dialog.setWindowTitle("Update Data")
-        # layout = QtWidgets.QVBoxLayout()
-
-        # ind_layout = QtWidgets.QHBoxLayout()
-        # ind_label = QtWidgets.QLabel("Independent Values: ")
-        # self.independent_variable = QtWidgets.QLineEdit()
-        # ind_layout.addWidget(ind_label)
-        # ind_layout.addWidget(self.independent_variable)
-
-        # dep_layout = QtWidgets.QHBoxLayout()
-        # dep_label = QtWidgets.QLabel("Dependent Values: ")
-        # self.dependent_variable = QtWidgets.QLineEdit()
-        # dep_layout.addWidget(dep_label)
-        # dep_layout.addWidget(self.dependent_variable)
-
-        # button = QtWidgets.QPushButton("Update")
-        # # button.clicked.connect(self.re_init_plot)
-
-        # layout.addLayout(ind_layout)
-        # layout.addLayout(dep_layout)
-        # layout.addWidget(button)
-
-        # button.clicked.connect(dialog.close)
-
-        # dialog.setLayout(layout)
-        # dialog.exec_()
 
     def switch_data(self):
         def save_complex_data():

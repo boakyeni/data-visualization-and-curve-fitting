@@ -32,12 +32,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.output = (None, None)
         self.xerrorwarning = settings["XERRORWARNING"]
         self.kwargs = kwargs
+        self.OG_model = self.fitter.model  # original model/ user entered model
         self.initGUI(**kwargs)
         # call fit here if complex
         # if self.fitter.is_complex:
         #     self.fit()
         self.plotwidget.update_plot()
-        self.OG_model = self.fitter.model  # original model/ user entered model
 
     def closeEvent(self, event):
         """needed to properly quit when running in IPython console / Spyder IDE"""
@@ -340,7 +340,7 @@ def execute_gui(
                 """
                 y = a * exp(-x / b)^2 * cos(c * x + d) + e
                 """
-                return a * (np.exp(-x / b) ** 2) * np.cos(c * x + d) + e
+                return a * (np.exp(-(x**2) / b**2)) * np.cos(c * x + d) + e
 
             def euler(x, a):
                 """
@@ -361,7 +361,7 @@ def execute_gui(
                 "y = a * exp(-x / b) + c": exp_decay,
                 "y = a * cos(b*x + c) + d": cosine_function,
                 "y = a * exp(-x / b) * cos(c * x + d) + e": decaying_oscillation,
-                "y = a * exp(-x / b)^2 * cos(c * x + d) + e": decaying_oscillation2,
+                "y = a * exp(-x^2 / b^2)* cos(c * x + d) + e": decaying_oscillation2,
                 "y = a * exp(i * x)": euler,
                 "y = a * exp(i * (b * w + c)) + d": complex_function,
             }

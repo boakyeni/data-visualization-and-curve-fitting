@@ -21,7 +21,7 @@ The GUI is supported on Python 3.7 and above.
 ### Getting Started
 1. If on MacOS M1 a conda environment will be needed
 2. import the gui:
-       `from curvefitgui import curve_fit_gui`
+       `from complex_curve_fit_gui import curve_fit_gui`
 3. define x and y data as 1 dimensional numpy arrays of equal length
        `xdata = np.array([1, 2, 3, 4, 5])`
        `ydata = np.array([-3.5, -2.4, -1, 0.5, 1.8])`
@@ -61,11 +61,15 @@ This starts up the GUI. The call signature is `curve_fit_gui(f,xdata,ydata,xerr=
  - title  : string, optional
         data plot title
  - p0 : array-like, optional
-        initial values for fit parameters, if not specified 1 is used for each parameter
+        initial values for fit parameters, if not specified 1 is used for each parameter, if specified length must be >= number of fit parameters else program crashes upon fit
+ - method : string, optional
+       desired fit method for lmfit model, default is "least squares"
  - showgui : boolean, optional (default=True)
         if True, the gui is shown, otherwise not
  - absolute_sigma : boolean, optional
         see doc-string scipy.optimize.curve_fit()
+ - add : array of tuple, optional
+       add additional data sets, requires format `[(np.array, np.array, string)]` which implies `[(x_data, y_data, label)]`. Multiple datasets can be placed in the array, and method is selectable within gui
  - kwargs
         keyword arguments for compatibility (e.g. you can use sigma to specify the error in y)
 
@@ -128,6 +132,11 @@ Options for customizing fitline inlclude color, linestyle, and thickness. The va
 10. **FitTextbox:** This textbox is generated if a valid fit is performed. It can be moved by the mouse to any convenient positions in the plot.
 11. **Range Selector** Activates/deactivates the range-selector. The range-selector allows to select a datarange used for fitting. Only datapoints that are within the two vertical dashed lines are considered during fitting. The lines can be moved using the mouse.
 ![Range Selector](images/range_selector_scr.png)
+12. **SELECT DATA** Allows user to switch between plotted dataset and desired fit model
+![select data button](images/select_data.png)
+![select data modal](images/switch_data_modal.png)
+13. **TOGGLE Residual** show/hide residual plot
+![toggle residual](images/toggle_residual.png)
 
 
 

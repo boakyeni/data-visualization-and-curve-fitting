@@ -1,5 +1,6 @@
 import inspect
 from dataclasses import dataclass, field
+from sys import stderr
 from typing import Any, List
 import copy
 import numpy as np
@@ -223,10 +224,21 @@ class Fitter:
         # process results
         self.fit_is_valid = True
         # print("cov", pcov)
-        stderrors = np.sqrt(np.diag(pcov))
-        for fitpar, value, stderr in zip(self.model.fitpars, popt, stderrors):
-            fitpar.value = value
-            fitpar.sigma = stderr
+        """
+        Standard error only works for least squares method another way to calculate standard error needs
+        to be added here
+        """
+        if pcov.any():
+            stderrors = np.sqrt(np.diag(pcov))
+            for fitpar, value, stderr in zip(
+                self.model.fitpars, popt, stderrors
+            ):
+                fitpar.value = value
+                fitpar.sigma = stderr
+        else:
+            for fitpar, value in zip(self.model.fitpars, popt):
+                fitpar.value = value
+                fitpar.sigma = 0
 
         self.mean_squared_error = sum(((y - self.model.evaluate(x)) / ye) ** 2)
 
@@ -325,14 +337,9 @@ class Fitter:
         # print(self)
 
 
-def curve_fit_wrapper(
-    model, *pargs, p0=None, pF=None, method="slsqp", **kwargs
-):
+def curve_fit_wrapper(model, *pargs, p0=None, pF=None, method, **kwargs):
     """
-    wrapper around the scipy curve_fit() function to allow parameters to be fixed
-    same call signature as the curve_fit() function except for:
-    pF : 1D numpy array of size n, with n the number of fitparameters of the function
-    returns the popt and cov matrices just like the original curve_fit() function
+    wrapper around the lmfit model
     """
 
     # extract arguments of the function func
@@ -383,8 +390,10 @@ def curve_fit_wrapper(
         calc_covar=True,
         nan_policy="omit",
         method=method,
-        max_nfev=100000000,
+        max_nfev=1000000000,
     )
+    # print("print", result.params["a"])
+    # print("print", result.params["a"].stderr)
 
     popt = np.array(list(result.best_values.values()))
     # print("cov values", result.covar)
@@ -409,7 +418,6 @@ def curve_fit_wrapper(
         )  # add zero rows and columns for fixed par
         cov = np.insert(cov, id, 0, axis=0)
 
-    # params here temporarily, in future move lmfit model to fitmodel so that params does not need to be returned here
     return popt, cov, result
 
 
